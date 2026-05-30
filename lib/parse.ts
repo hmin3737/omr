@@ -10,7 +10,8 @@ import type { ParsedResult, StudentRecord } from "./stats";
 const NAME_KEYS = ["성명", "이름", "name"];
 const ID_KEYS = ["수험번호", "번호", "id"];
 const SCORE_KEYS = ["점수", "총점", "score"];
-const META_KEYS = ["선택", "구분", "반"]; // 문항이 아닌 부가 컬럼
+const ELECTIVE_KEYS = ["선택", "선택과목"]; // 1=확통, 2=미적, 3=기하
+const META_KEYS = ["선택", "선택과목", "구분", "반"]; // 문항이 아닌 부가 컬럼
 
 export async function parseFile(file: File, examName: string): Promise<ParsedResult> {
   const buf = await file.arrayBuffer();
@@ -31,6 +32,7 @@ export async function parseFile(file: File, examName: string): Promise<ParsedRes
   const nameCol = findCol(NAME_KEYS);
   const idCol = findCol(ID_KEYS);
   const scoreCol = findCol(SCORE_KEYS);
+  const electiveCol = findCol(ELECTIVE_KEYS);
   if (scoreCol < 0) {
     throw new Error("'점수' 컬럼을 찾을 수 없습니다. 헤더를 확인하세요.");
   }
@@ -58,12 +60,21 @@ export async function parseFile(file: File, examName: string): Promise<ParsedRes
     const score = String(rawScore ?? "").trim() === "" || Number.isNaN(scoreNum) ? null : scoreNum;
 
     const correct = questionCols.map((c) => String(row[c] ?? "").trim().toUpperCase() === "O");
+    const answered = questionCols.map((c) => String(row[c] ?? "").trim() !== "");
+
+    let elective: number | null = null;
+    if (electiveCol >= 0) {
+      const ev = Number(String(row[electiveCol] ?? "").trim());
+      if (ev === 1 || ev === 2 || ev === 3) elective = ev;
+    }
 
     students.push({
       name: nameCol >= 0 ? String(row[nameCol] ?? "").trim() : `학생${r}`,
       id: idCol >= 0 ? String(row[idCol] ?? "").trim() : "",
       score,
+      elective,
       correct,
+      answered,
     });
   }
 

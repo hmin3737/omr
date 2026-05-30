@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas-pro";
-import type { StatReport, StatKey } from "./stats";
+import { ELECTIVE_SHORT, type StatReport, type StatKey } from "./stats";
 
 const STAT_LABELS: Record<StatKey, string> = {
   count: "응시자수",
@@ -14,16 +14,25 @@ const STAT_LABELS: Record<StatKey, string> = {
   grade: "무보정 등급",
 };
 
+/** break down 시 선택과목별 값을 "(미적 80 · 확통 40)" 형태 문자열로 */
+function bd(report: StatReport, pick: (es: StatReport["electiveStats"][number]) => number | string): string {
+  if (!report.breakdown) return "";
+  return ` (${report.electiveStats.map((es) => `${es.short} ${pick(es)}`).join(" · ")})`;
+}
+
 /** 통계 요약을 [항목, 값] 쌍 배열로 만든다 (선택된 항목만) */
 function summaryPairs(report: StatReport): [string, string][] {
   const o = report.options.selected;
   const pairs: [string, string][] = [];
-  if (o.count) pairs.push([STAT_LABELS.count, `${report.count}명`]);
-  if (o.mean) pairs.push([STAT_LABELS.mean, `${report.mean}`]);
-  if (o.stdev) pairs.push([STAT_LABELS.stdev, `${report.stdev}`]);
+  if (o.count) pairs.push([STAT_LABELS.count, `${report.count}명${bd(report, (es) => es.count)}`]);
+  if (o.mean) pairs.push([STAT_LABELS.mean, `${report.mean}${bd(report, (es) => es.mean)}`]);
+  if (o.stdev) pairs.push([STAT_LABELS.stdev, `${report.stdev}${bd(report, (es) => es.stdev)}`]);
   if (o.perfect) {
     if (report.perfectCount > 0) {
-      pairs.push([STAT_LABELS.perfect, `${report.perfectCount}명`]);
+      pairs.push([
+        STAT_LABELS.perfect,
+        `${report.perfectCount}명${bd(report, (es) => es.perfectCount)}`,
+      ]);
     } else {
       pairs.push([
         STAT_LABELS.perfect,
@@ -54,9 +63,25 @@ export function buildXlsx(report: StatReport): void {
   aoa.push([]);
   aoa.push([`정답률 ${report.options.lowAccuracyThreshold}% 미만 문제`]);
   if (report.lowAccuracy.length) {
-    aoa.push(["문항", "정답률(%)", "정답 인원"]);
+    const head: (string | number)[] = ["문항", "전체(%)"];
+    if (report.breakdown) {
+      for (const e of report.electivesPresent) head.push(`${ELECTIVE_SHORT[e]}(%)`);
+    }
+    head.push("정답 인원");
+    aoa.push(head);
     for (const q of report.lowAccuracy) {
-      aoa.push([q.label, q.correctRate, `${q.correctCount}/${q.total}`]);
+      const line: (string | number)[] = [
+        q.label + (q.electiveTag ? ` (${q.electiveTag})` : ""),
+        q.correctRate,
+      ];
+      if (report.breakdown) {
+        for (const e of report.electivesPresent) {
+          const v = q.perElective?.[e];
+          line.push(v === null || v === undefined ? "" : v);
+        }
+      }
+      line.push(`${q.correctCount}/${q.total}`);
+      aoa.push(line);
     }
   } else {
     aoa.push(["해당 문항 없음"]);

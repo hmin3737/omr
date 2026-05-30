@@ -1,5 +1,11 @@
 import { forwardRef } from "react";
-import type { StatReport } from "@/lib/stats";
+import type { StatReport, ElectiveStat } from "@/lib/stats";
+
+/** break down 시 선택과목별 값을 "(미적 80 · 확통 40)" 형태 문자열로 */
+function bd(report: StatReport, pick: (es: ElectiveStat) => number | string): string {
+  if (!report.breakdown) return "";
+  return ` (${report.electiveStats.map((es) => `${es.short} ${pick(es)}`).join(" · ")})`;
+}
 
 const ReportView = forwardRef<HTMLDivElement, { report: StatReport }>(
   function ReportView({ report }, ref) {
@@ -14,16 +20,20 @@ const ReportView = forwardRef<HTMLDivElement, { report: StatReport }>(
           분석 대상 {analyzed}명
           {report.removedCount > 0 && ` · 허수 ${report.removedCount}명 제거`}
           {report.ungradedCount > 0 && ` · 미산출 ${report.ungradedCount}명 제외`}
+          {report.breakdown && " · 선택과목별 분리"}
         </div>
 
         <div className="section-title">시험 통계</div>
         <div className="kv">
-          {o.count && <KV k="응시자수" v={`${report.count}명`} />}
-          {o.mean && <KV k="평균" v={`${report.mean}`} />}
-          {o.stdev && <KV k="표준편차" v={`${report.stdev}`} />}
+          {o.count && <KV k="응시자수" v={`${report.count}명${bd(report, (es) => es.count)}`} />}
+          {o.mean && <KV k="평균" v={`${report.mean}${bd(report, (es) => es.mean)}`} />}
+          {o.stdev && <KV k="표준편차" v={`${report.stdev}${bd(report, (es) => es.stdev)}`} />}
           {o.perfect &&
             (report.perfectCount > 0 ? (
-              <KV k="100점 수" v={`${report.perfectCount}명`} />
+              <KV
+                k="100점 수"
+                v={`${report.perfectCount}명${bd(report, (es) => es.perfectCount)}`}
+              />
             ) : (
               <KV
                 k="100점 수"
@@ -43,15 +53,29 @@ const ReportView = forwardRef<HTMLDivElement, { report: StatReport }>(
                 <thead>
                   <tr>
                     <th>문항</th>
-                    <th>정답률</th>
+                    <th>전체</th>
+                    {report.breakdown &&
+                      report.electivesPresent.map((e) => (
+                        <th key={e}>{shortLabel(e)}</th>
+                      ))}
                     <th>정답 인원</th>
                   </tr>
                 </thead>
                 <tbody>
                   {report.lowAccuracy.map((q) => (
                     <tr key={q.label}>
-                      <td>{q.label}</td>
+                      <td>
+                        {q.label}
+                        {q.electiveTag ? ` (${q.electiveTag})` : ""}
+                      </td>
                       <td>{q.correctRate}%</td>
+                      {report.breakdown &&
+                        report.electivesPresent.map((e) => {
+                          const v = q.perElective?.[e];
+                          return (
+                            <td key={e}>{v === null || v === undefined ? "" : `${v}%`}</td>
+                          );
+                        })}
                       <td>
                         {q.correctCount}/{q.total}
                       </td>
@@ -96,6 +120,11 @@ const ReportView = forwardRef<HTMLDivElement, { report: StatReport }>(
     );
   }
 );
+
+const SHORT: Record<number, string> = { 1: "확통", 2: "미적", 3: "기하" };
+function shortLabel(e: number) {
+  return SHORT[e] ?? String(e);
+}
 
 function KV({ k, v }: { k: string; v: string }) {
   return (
