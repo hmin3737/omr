@@ -1,16 +1,13 @@
-// Prisma schema — Vercel Postgres / Neon
-// DATABASE_URL: 풀링 연결 문자열, DIRECT_URL: 마이그레이션용 비풀링 연결 문자열
-// Vercel Postgres 통합을 쓰는 경우 POSTGRES_PRISMA_URL → DATABASE_URL,
-// POSTGRES_URL_NON_POOLING → DIRECT_URL 로 매핑하면 됩니다.
+// Prisma schema — Vercel Prisma Postgres 통합
+// 통합이 DATABASE_URL(postgres:// 형식) 하나만 주입하므로 그것만 사용한다.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Exam {
