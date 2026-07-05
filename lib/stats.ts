@@ -43,10 +43,12 @@ export interface QuestionAccuracy {
   correctRate: number; // 전체(적용 그룹 합산) 정답률 %
   correctCount: number;
   total: number;
-  /** break down 시 선택과목별 정답률(%). 해당 과목 문제가 아니면 null */
+  /** break down 시 선택과목별 정답률(%). 해당 과목 문제가 아니면 null → "-" 표시 */
   perElective?: Record<number, number | null>;
   /** 선택과목 전용 문제일 때 해당 과목 표기(예: "미적"). 공통 문제면 null */
   electiveTag?: string | null;
+  /** 선택과목 문항(23번 이후 등) 여부 */
+  isElective?: boolean;
 }
 
 export interface ConversionRow {
@@ -81,6 +83,8 @@ export interface StatOptions {
   cutoff: number | null; // 허수 제거 기준(이 점수 이하 제거). null이면 미적용
   selected: Record<StatKey, boolean>;
   lowAccuracyThreshold: number; // 정답률(%) 이 값 미만이면 "정답률 낮은 문제"
+  /** 이 번호 이상의 문항을 선택과목 문항으로 취급(선택과목 이름 접두). null이면 미적용 */
+  electiveStart: number | null;
 }
 
 export interface StatReport {
@@ -190,7 +194,13 @@ export function computeReport(parsed: ParsedResult, options: StatOptions): StatR
   const conversion = buildConversion(scores, overall.mean, overall.stdev);
 
   // 문항별 정답률 (kept 학생 기준)
-  const allAccuracy = computeAccuracy(kept, parsed.questionLabels, electivesPresent, breakdown);
+  const allAccuracy = computeAccuracy(
+    kept,
+    parsed.questionLabels,
+    electivesPresent,
+    breakdown,
+    options.electiveStart
+  );
   const lowAccuracy = allAccuracy
     .filter((q) => q.correctRate < options.lowAccuracyThreshold)
     .sort((a, b) => a.correctRate - b.correctRate);
@@ -241,31 +251,73 @@ function buildConversion(scores: number[], mean: number, stdev: number): Convers
   });
 }
 
+/** 문항 라벨에서 문항 번호를 추출("단30"→30, "23"→23). 숫자가 없으면 null */
+function questionNumber(label: string): number | null {
+  const m = String(label).match(/\d+/);
+  return m ? Number(m[0]) : null;
+}
+
+function isElectiveQuestion(label: string, electiveStart: number | null): boolean {
+  if (electiveStart === null) return false;
+  const n = questionNumber(label);
+  return n !== null && n >= electiveStart;
+}
+
 function computeAccuracy(
   students: StudentRecord[],
   labels: string[],
   electivesPresent: number[],
-  breakdown: boolean
+  breakdown: boolean,
+  electiveStart: number | null
 ): QuestionAccuracy[] {
-  if (!breakdown) {
-    const total = students.length;
-    return labels.map((label, i) => {
-      const correctCount = students.filter((s) => s.correct[i]).length;
-      return {
-        label,
-        correctRate: round2(total ? (correctCount / total) * 100 : 0),
-        correctCount,
-        total,
-      };
-    });
-  }
-
   const groups = electivesPresent.map((e) => ({
     e,
     members: students.filter((s) => s.elective === e),
   }));
 
-  return labels.map((label, i) => {
+  const out: QuestionAccuracy[] = [];
+
+  labels.forEach((label, i) => {
+    const num = questionNumber(label);
+    const elective = isElectiveQuestion(label, electiveStart);
+
+    // 선택과목 문항: 선택과목별로 문제가 다르므로 응시 과목마다 별도 행으로 분리한다.
+    // 라벨은 "미적30"처럼 [선택과목 이름]+번호로 표기하고,
+    // 응시하지 않은 타 선택과목 칸은 null(→ "-")로 둔다.
+    if (elective && groups.length) {
+      for (const { e, members } of groups) {
+        const responded = members.filter((s) => s.answered[i]).length;
+        if (responded === 0) continue; // 이 과목은 해당 문항을 응시하지 않음
+        const c = members.filter((s) => s.correct[i]).length;
+        const rate = round2(members.length ? (c / members.length) * 100 : 0);
+        const perElective: Record<number, number | null> = {};
+        for (const g of groups) perElective[g.e] = g.e === e ? rate : null;
+        out.push({
+          label: `${ELECTIVE_SHORT[e]}${num ?? label}`,
+          correctRate: rate,
+          correctCount: c,
+          total: members.length,
+          perElective: breakdown ? perElective : undefined,
+          electiveTag: null,
+          isElective: true,
+        });
+      }
+      return;
+    }
+
+    // 공통 문항
+    if (!breakdown) {
+      const total = students.length;
+      const correctCount = students.filter((s) => s.correct[i]).length;
+      out.push({
+        label,
+        correctRate: round2(total ? (correctCount / total) * 100 : 0),
+        correctCount,
+        total,
+      });
+      return;
+    }
+
     const perElective: Record<number, number | null> = {};
     let correctAll = 0;
     let totalAll = 0;
@@ -274,7 +326,6 @@ function computeAccuracy(
     for (const { e, members } of groups) {
       const responded = members.filter((s) => s.answered[i]).length;
       if (responded === 0) {
-        // 이 선택과목 응시자는 아무도 응답하지 않음 → 해당 과목 문제가 아님
         perElective[e] = null;
         continue;
       }
@@ -290,13 +341,15 @@ function computeAccuracy(
         ? applicable.map((e) => ELECTIVE_SHORT[e]).join("·")
         : null;
 
-    return {
+    out.push({
       label,
       correctRate: round2(totalAll ? (correctAll / totalAll) * 100 : 0),
       correctCount: correctAll,
       total: totalAll,
       perElective,
       electiveTag,
-    };
+    });
   });
+
+  return out;
 }

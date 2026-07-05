@@ -77,7 +77,7 @@ export function buildXlsx(report: StatReport): void {
       if (report.breakdown) {
         for (const e of report.electivesPresent) {
           const v = q.perElective?.[e];
-          line.push(v === null || v === undefined ? "" : v);
+          line.push(v === null || v === undefined ? "-" : v);
         }
       }
       line.push(`${q.correctCount}/${q.total}`);

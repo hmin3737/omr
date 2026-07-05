@@ -140,6 +140,120 @@ input:focus {
   font-size: 13px;
   margin-top: 12px;
 }
+.notice {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.editing-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.link-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- 저장된 시험 목록 ---- */
+.saved {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-top: 24px;
+}
+.saved-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.saved-head h3 {
+  font-size: 16px;
+}
+.saved-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+.saved-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 8px 0;
+}
+.exam-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.exam-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.exam-item.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.exam-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.exam-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.exam-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.exam-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.exam-actions button {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.exam-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.exam-actions button.danger:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+.exam-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ---- 미리보기(리포트) ---- */
 .report {

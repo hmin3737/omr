@@ -1,9 +1,19 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseFile } from "@/lib/parse";
 import { computeReport, type StatKey, type StatReport } from "@/lib/stats";
 import { buildXlsx, buildPdf } from "@/lib/export";
+import {
+  createExam,
+  deleteExam,
+  downloadExamFile,
+  fetchExamFile,
+  listExams,
+  updateExam,
+  type ExamSettings,
+  type SavedExam,
+} from "@/lib/store";
 import ReportView from "./ReportView";
 
 const STAT_ITEMS: { key: StatKey; label: string }[] = [
@@ -17,31 +27,87 @@ const STAT_ITEMS: { key: StatKey; label: string }[] = [
   { key: "grade", label: "무보정 등급" },
 ];
 
+const DEFAULT_SELECTED: Record<StatKey, boolean> = {
+  count: true,
+  mean: true,
+  stdev: true,
+  perfect: true,
+  top30: true,
+  percentile: true,
+  standardScore: true,
+  grade: true,
+};
+
+function parseElectiveStart(v: string): number | null {
+  const n = Number(v);
+  return v.trim() === "" || Number.isNaN(n) ? null : n;
+}
+
+function fmtDate(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export default function Home() {
   const [examName, setExamName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [cutoff, setCutoff] = useState("");
   const [lowThreshold, setLowThreshold] = useState("50");
-  const [selected, setSelected] = useState<Record<StatKey, boolean>>({
-    count: true,
-    mean: true,
-    stdev: true,
-    perfect: true,
-    top30: true,
-    percentile: true,
-    standardScore: true,
-    grade: true,
-  });
+  const [electiveStart, setElectiveStart] = useState("23");
+  const [selected, setSelected] = useState<Record<StatKey, boolean>>(DEFAULT_SELECTED);
   const [report, setReport] = useState<StatReport | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const reportRef = useRef<HTMLDivElement>(null);
 
-  const toggle = (k: StatKey) =>
-    setSelected((s) => ({ ...s, [k]: !s[k] }));
+  // 저장된 시험 관리
+  const [exams, setExams] = useState<SavedExam[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
+  const reportRef = useRef<HTMLDivElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceTargetRef = useRef<string | null>(null);
+
+  const currentExam = exams.find((e) => e.id === currentId) ?? null;
+
+  useEffect(() => {
+    refreshExams();
+  }, []);
+
+  async function refreshExams() {
+    try {
+      setExams(await listExams());
+    } catch {
+      /* IndexedDB 사용 불가 환경은 무시 */
+    }
+  }
+
+  const toggle = (k: StatKey) => setSelected((s) => ({ ...s, [k]: !s[k] }));
+
+  function currentSettings(): ExamSettings {
+    return { cutoff, lowThreshold, electiveStart, selected };
+  }
+
+  function buildReport(parsedSource: File, name: string) {
+    return (async () => {
+      const parsed = await parseFile(parsedSource, name);
+      const cutoffNum =
+        cutoff.trim() === "" || Number.isNaN(Number(cutoff)) ? null : Number(cutoff);
+      const rep = computeReport(parsed, {
+        cutoff: cutoffNum,
+        selected,
+        lowAccuracyThreshold: Number(lowThreshold),
+        electiveStart: parseElectiveStart(electiveStart),
+      });
+      if (rep.count === 0)
+        throw new Error("분석 대상 인원이 0명입니다. 허수 제거 기준을 확인하세요.");
+      return rep;
+    })();
+  }
 
   async function handleGenerate() {
     setError("");
+    setNotice("");
     if (!examName.trim()) return setError("시험명을 입력하세요.");
     if (!file) return setError("채점결과 파일을 올리세요.");
     if (lowThreshold.trim() === "" || Number.isNaN(Number(lowThreshold)))
@@ -49,23 +115,142 @@ export default function Home() {
 
     setBusy(true);
     try {
-      const parsed = await parseFile(file, examName.trim());
-      const cutoffNum =
-        cutoff.trim() === "" || Number.isNaN(Number(cutoff)) ? null : Number(cutoff);
-      const rep = computeReport(parsed, {
-        cutoff: cutoffNum,
-        selected,
-        lowAccuracyThreshold: Number(lowThreshold),
-      });
-      if (rep.count === 0)
-        throw new Error("분석 대상 인원이 0명입니다. 허수 제거 기준을 확인하세요.");
-      setReport(rep);
+      setReport(await buildReport(file, examName.trim()));
     } catch (e) {
       setReport(null);
       setError(e instanceof Error ? e.message : "파일 처리 중 오류가 발생했습니다.");
     } finally {
       setBusy(false);
     }
+  }
+
+  // 현재 입력을 새 시험으로 저장하거나, 불러온 시험이면 덮어쓴다.
+  async function handleSave() {
+    setError("");
+    setNotice("");
+    if (!examName.trim()) return setError("시험명을 입력하세요.");
+    if (!file && !currentExam) return setError("채점결과 파일을 올리세요.");
+
+    setBusy(true);
+    try {
+      const settings = currentSettings();
+      if (currentExam) {
+        const patch: Parameters<typeof updateExam>[1] = {
+          name: examName.trim(),
+          settings,
+        };
+        if (file) patch.file = file;
+        await updateExam(currentExam.id, patch);
+        setNotice("시험을 갱신했습니다.");
+      } else {
+        const created = await createExam(examName.trim(), file as File, settings);
+        setCurrentId(created.id);
+        setNotice("시험을 저장했습니다.");
+      }
+      await refreshExams();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "저장 중 오류가 발생했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 저장된 시험을 폼으로 불러오고 통계를 재생성한다.
+  async function handleLoad(exam: SavedExam) {
+    setError("");
+    setNotice("");
+    setBusy(true);
+    try {
+      setExamName(exam.name);
+      setCutoff(exam.settings.cutoff);
+      setLowThreshold(exam.settings.lowThreshold);
+      setElectiveStart(exam.settings.electiveStart ?? "23");
+      setSelected(exam.settings.selected);
+      setCurrentId(exam.id);
+      const f = await fetchExamFile(exam);
+      setFile(f);
+
+      // 불러오기 즉시 통계를 재생성 (저장된 설정 사용)
+      const parsed = await parseFile(f, exam.name);
+      const cutoffNum =
+        exam.settings.cutoff.trim() === "" || Number.isNaN(Number(exam.settings.cutoff))
+          ? null
+          : Number(exam.settings.cutoff);
+      const rep = computeReport(parsed, {
+        cutoff: cutoffNum,
+        selected: exam.settings.selected,
+        lowAccuracyThreshold: Number(exam.settings.lowThreshold) || 0,
+        electiveStart: parseElectiveStart(exam.settings.electiveStart ?? "23"),
+      });
+      setReport(rep.count === 0 ? null : rep);
+      if (rep.count === 0) setError("분석 대상 인원이 0명입니다. 허수 제거 기준을 확인하세요.");
+      else setNotice(`"${exam.name}" 시험을 불러왔습니다.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRename(exam: SavedExam) {
+    const next = window.prompt("새 시험명을 입력하세요.", exam.name);
+    if (next === null) return;
+    if (!next.trim()) return setError("시험명은 비울 수 없습니다.");
+    try {
+      await updateExam(exam.id, { name: next.trim() });
+      if (currentId === exam.id) setExamName(next.trim());
+      await refreshExams();
+      setNotice("시험명을 변경했습니다.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "이름 변경 중 오류가 발생했습니다.");
+    }
+  }
+
+  // 특정 시험의 원본 파일 교체 (숨겨진 file input을 통해)
+  function startReplace(examId: string) {
+    replaceTargetRef.current = examId;
+    replaceInputRef.current?.click();
+  }
+
+  async function handleReplacePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files?.[0];
+    e.target.value = ""; // 같은 파일 재선택 가능하도록 초기화
+    const targetId = replaceTargetRef.current;
+    replaceTargetRef.current = null;
+    if (!picked || !targetId) return;
+    try {
+      const updated = await updateExam(targetId, { file: picked });
+      await refreshExams();
+      setNotice("원본 파일을 교체했습니다.");
+      if (currentId === targetId) await handleLoad(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "파일 교체 중 오류가 발생했습니다.");
+    }
+  }
+
+  async function handleDelete(exam: SavedExam) {
+    if (!window.confirm(`"${exam.name}" 시험을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    try {
+      await deleteExam(exam.id);
+      if (currentId === exam.id) setCurrentId(null);
+      await refreshExams();
+      setNotice("시험을 삭제했습니다.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "삭제 중 오류가 발생했습니다.");
+    }
+  }
+
+  function handleNew() {
+    setCurrentId(null);
+    setExamName("");
+    setFile(null);
+    setCutoff("");
+    setLowThreshold("50");
+    setElectiveStart("23");
+    setSelected(DEFAULT_SELECTED);
+    setReport(null);
+    setError("");
+    setNotice("");
   }
 
   async function handlePdf() {
@@ -77,10 +262,28 @@ export default function Home() {
       <h1>OMR 통계 생성기</h1>
       <p className="sub">
         OMR 채점결과 파일을 올리면 시험 통계 자료를 한 페이지짜리 xlsx · pdf로 생성합니다.
+        시험을 저장하면 나중에 언제든 통계를 다시 만들고 원본 파일도 내려받을 수 있습니다.
       </p>
+
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept=".xls,.xlsx,.csv"
+        style={{ display: "none" }}
+        onChange={handleReplacePicked}
+      />
 
       <div className="layout">
         <div className="card">
+          {currentExam && (
+            <div className="editing-tag">
+              편집 중: <b>{currentExam.name}</b>
+              <button className="link-btn" onClick={handleNew}>
+                새 시험으로
+              </button>
+            </div>
+          )}
+
           <div className="field">
             <label className="lab">
               시험명 <span className="req">*</span>
@@ -95,14 +298,18 @@ export default function Home() {
 
           <div className="field">
             <label className="lab">
-              채점결과 파일 <span className="req">*</span>
+              채점결과 파일 {!currentExam && <span className="req">*</span>}
             </label>
             <input
               type="file"
               accept=".xls,.xlsx,.csv"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-            <p className="hint">xls / xlsx / csv 지원. 데이터는 브라우저 안에서만 처리됩니다.</p>
+            <p className="hint">
+              {currentExam
+                ? "비워두면 저장된 원본 파일을 그대로 사용합니다. 새 파일을 올리면 교체됩니다."
+                : "xls / xlsx / csv 지원. 데이터는 브라우저 안에서만 처리됩니다."}
+            </p>
           </div>
 
           <div className="field">
@@ -114,6 +321,20 @@ export default function Home() {
               placeholder="예: 20 → 20점 이하 제거"
             />
             <p className="hint">입력한 점수 이하의 응시자를 통계에서 제외합니다.</p>
+          </div>
+
+          <div className="field">
+            <label className="lab">선택과목 시작 문항 번호 (선택)</label>
+            <input
+              type="number"
+              value={electiveStart}
+              onChange={(e) => setElectiveStart(e.target.value)}
+              placeholder="예: 23 → 23번부터 선택과목 문항"
+            />
+            <p className="hint">
+              이 번호 이상의 문항은 선택과목별로 분리되어 <b>미적30</b>처럼 표기되고, 응시하지 않은
+              과목은 <b>-</b>로 표시됩니다. 비우면 적용하지 않습니다.
+            </p>
           </div>
 
           <div className="field">
@@ -145,8 +366,13 @@ export default function Home() {
           </div>
 
           <button className="btn" onClick={handleGenerate} disabled={busy}>
-            {busy ? "생성 중..." : "통계 생성"}
+            {busy ? "처리 중..." : "통계 생성"}
           </button>
+          <div className="btn-row">
+            <button className="btn secondary" onClick={handleSave} disabled={busy}>
+              {currentExam ? "시험 갱신 저장" : "시험 저장"}
+            </button>
+          </div>
           {report && (
             <div className="btn-row">
               <button className="btn secondary" onClick={() => buildXlsx(report)}>
@@ -158,6 +384,7 @@ export default function Home() {
             </div>
           )}
           {error && <div className="error">{error}</div>}
+          {notice && <div className="notice">{notice}</div>}
         </div>
 
         <div>
@@ -170,6 +397,42 @@ export default function Home() {
               </p>
             </div>
           )}
+
+          <div className="saved">
+            <div className="saved-head">
+              <h3>저장된 시험</h3>
+              <span className="saved-count">{exams.length}개</span>
+            </div>
+            {exams.length === 0 ? (
+              <p className="saved-empty">
+                아직 저장된 시험이 없습니다. 왼쪽에서 시험을 입력하고 <b>시험 저장</b>을 누르세요.
+              </p>
+            ) : (
+              <ul className="exam-list">
+                {exams.map((ex) => (
+                  <li key={ex.id} className={ex.id === currentId ? "exam-item active" : "exam-item"}>
+                    <div className="exam-info">
+                      <span className="exam-name">{ex.name}</span>
+                      <span className="exam-meta">
+                        {ex.fileName} · 수정 {fmtDate(ex.updatedAt)}
+                      </span>
+                    </div>
+                    <div className="exam-actions">
+                      <button onClick={() => handleLoad(ex)} disabled={busy}>
+                        불러오기
+                      </button>
+                      <button onClick={() => handleRename(ex)}>이름변경</button>
+                      <button onClick={() => startReplace(ex.id)}>파일교체</button>
+                      <button onClick={() => downloadExamFile(ex)}>원본</button>
+                      <button className="danger" onClick={() => handleDelete(ex)}>
+                        삭제
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </div>

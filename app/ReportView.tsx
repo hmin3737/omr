@@ -73,7 +73,7 @@ const ReportView = forwardRef<HTMLDivElement, { report: StatReport }>(
                         report.electivesPresent.map((e) => {
                           const v = q.perElective?.[e];
                           return (
-                            <td key={e}>{v === null || v === undefined ? "" : `${v}%`}</td>
+                            <td key={e}>{v === null || v === undefined ? "-" : `${v}%`}</td>
                           );
                         })}
                       <td>
