@@ -14,6 +14,7 @@ export async function GET() {
       fileName: true,
       fileType: true,
       settings: true,
+      note: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
     const form = await req.formData();
     const name = String(form.get("name") ?? "").trim();
     const settingsRaw = String(form.get("settings") ?? "");
+    const note = String(form.get("note") ?? "");
     const file = form.get("file");
 
     if (!name) return NextResponse.json({ error: "시험명이 필요합니다." }, { status: 400 });
@@ -43,6 +45,7 @@ export async function POST(req: Request) {
         fileType: file.type,
         fileData: buf,
         settings,
+        note,
       },
       select: {
         id: true,
@@ -50,6 +53,7 @@ export async function POST(req: Request) {
         fileName: true,
         fileType: true,
         settings: true,
+        note: true,
         createdAt: true,
         updatedAt: true,
       },

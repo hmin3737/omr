@@ -14,3 +14,6 @@ CREATE TABLE IF NOT EXISTS "Exam" (
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "Exam_updatedAt_idx" ON "Exam"("updatedAt");
+
+-- AddColumn: 시험 메모 (기존 테이블에도 idempotent 하게 추가)
+ALTER TABLE "Exam" ADD COLUMN IF NOT EXISTS "note" TEXT NOT NULL DEFAULT '';

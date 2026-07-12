@@ -14,6 +14,7 @@ import {
   type ExamSettings,
   type SavedExam,
 } from "@/lib/store";
+import { CHANGELOG, LATEST } from "@/lib/changelog";
 import ReportView from "./ReportView";
 
 const STAT_ITEMS: { key: StatKey; label: string }[] = [
@@ -33,9 +34,9 @@ const DEFAULT_SELECTED: Record<StatKey, boolean> = {
   stdev: true,
   perfect: true,
   top30: true,
-  percentile: true,
-  standardScore: true,
-  grade: true,
+  percentile: false,
+  standardScore: false,
+  grade: false,
 };
 
 function parseElectiveStart(v: string): number | null {
@@ -55,7 +56,9 @@ export default function Home() {
   const [cutoff, setCutoff] = useState("");
   const [lowThreshold, setLowThreshold] = useState("50");
   const [electiveStart, setElectiveStart] = useState("23");
+  const [note, setNote] = useState("");
   const [selected, setSelected] = useState<Record<StatKey, boolean>>(DEFAULT_SELECTED);
+  const [showChangelog, setShowChangelog] = useState(false);
   const [report, setReport] = useState<StatReport | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -138,12 +141,13 @@ export default function Home() {
         const patch: Parameters<typeof updateExam>[1] = {
           name: examName.trim(),
           settings,
+          note,
         };
         if (file) patch.file = file;
         await updateExam(currentExam.id, patch);
         setNotice("시험을 갱신했습니다.");
       } else {
-        const created = await createExam(examName.trim(), file as File, settings);
+        const created = await createExam(examName.trim(), file as File, settings, note);
         setCurrentId(created.id);
         setNotice("시험을 저장했습니다.");
       }
@@ -165,6 +169,7 @@ export default function Home() {
       setCutoff(exam.settings.cutoff);
       setLowThreshold(exam.settings.lowThreshold);
       setElectiveStart(exam.settings.electiveStart ?? "23");
+      setNote(exam.note ?? "");
       setSelected(exam.settings.selected);
       setCurrentId(exam.id);
       const f = await fetchExamFile(exam);
@@ -247,6 +252,7 @@ export default function Home() {
     setCutoff("");
     setLowThreshold("50");
     setElectiveStart("23");
+    setNote("");
     setSelected(DEFAULT_SELECTED);
     setReport(null);
     setError("");
@@ -259,6 +265,19 @@ export default function Home() {
 
   return (
     <div className="wrap">
+      <div className="banner">
+        <div className="banner-main">
+          <span className="banner-badge">v{LATEST.version}</span>
+          <span className="banner-title">{LATEST.title}</span>
+          <span className="banner-date">{LATEST.date}</span>
+        </div>
+        <button className="banner-btn" onClick={() => setShowChangelog(true)}>
+          패치 노트
+        </button>
+      </div>
+
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+
       <h1>OMR 통계 생성기</h1>
       <p className="sub">
         OMR 채점결과 파일을 올리면 시험 통계 자료를 한 페이지짜리 xlsx · pdf로 생성합니다.
@@ -308,7 +327,7 @@ export default function Home() {
             <p className="hint">
               {currentExam
                 ? "비워두면 저장된 원본 파일을 그대로 사용합니다. 새 파일을 올리면 교체됩니다."
-                : "xls / xlsx / csv 지원. 데이터는 브라우저 안에서만 처리됩니다."}
+                : "xlsx만 지원. 데이터는 브라우저 안에서만 처리됩니다."}
             </p>
           </div>
 
@@ -365,6 +384,17 @@ export default function Home() {
             </div>
           </div>
 
+          <div className="field">
+            <label className="lab">메모 (선택)</label>
+            <textarea
+              className="memo"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="이 시험에 대한 메모를 남겨두세요. 저장 시 함께 보관됩니다."
+              rows={3}
+            />
+          </div>
+
           <button className="btn" onClick={handleGenerate} disabled={busy}>
             {busy ? "처리 중..." : "통계 생성"}
           </button>
@@ -416,6 +446,7 @@ export default function Home() {
                       <span className="exam-meta">
                         {ex.fileName} · 수정 {fmtDate(ex.updatedAt)}
                       </span>
+                      {ex.note && <span className="exam-note">{ex.note}</span>}
                     </div>
                     <div className="exam-actions">
                       <button onClick={() => handleLoad(ex)} disabled={busy}>
@@ -433,6 +464,37 @@ export default function Home() {
               </ul>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChangelogModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>패치 노트</h2>
+          <button className="modal-close" onClick={onClose} aria-label="닫기">
+            ×
+          </button>
+        </div>
+        <div className="modal-body">
+          {CHANGELOG.map((rel) => (
+            <div className="release" key={rel.version}>
+              <div className="release-head">
+                <span className="release-ver">v{rel.version}</span>
+                <span className="release-title">{rel.title}</span>
+                <span className="release-date">{rel.date}</span>
+              </div>
+              <ul className="release-changes">
+                {rel.changes.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </div>
     </div>

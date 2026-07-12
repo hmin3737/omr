@@ -11,6 +11,7 @@ const META_SELECT = {
   fileName: true,
   fileType: true,
   settings: true,
+  note: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -30,6 +31,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const settingsRaw = form.get("settings");
     if (settingsRaw !== null) data.settings = JSON.parse(String(settingsRaw));
+
+    const note = form.get("note");
+    if (note !== null) data.note = String(note);
 
     const file = form.get("file");
     if (file instanceof File) {

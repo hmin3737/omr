@@ -17,6 +17,7 @@ model Exam {
   fileType  String
   fileData  Bytes // 원본 채점결과 파일 내용
   settings  Json // ExamSettings (cutoff, lowThreshold, electiveStart, selected)
+  note      String  @default("") // 시험 메모
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

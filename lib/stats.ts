@@ -65,6 +65,7 @@ export interface ElectiveStat {
   mean: number;
   stdev: number;
   perfectCount: number;
+  perfectNames: string[]; // 100점 학생 이름
   maxScore: number;
   maxScoreCount: number;
 }
@@ -95,8 +96,10 @@ export interface StatReport {
   mean: number;
   stdev: number;
   perfectCount: number;
+  perfectNames: string[]; // 100점 학생 이름 (전체)
   maxScore: number;
   maxScoreCount: number;
+  maxScoreNames: string[]; // 만점자가 없을 때 최고점 학생 이름
   top30Mean: number;
   top30N: number;
   conversion: ConversionRow[];
@@ -168,9 +171,8 @@ export function computeReport(parsed: ParsedResult, options: StatOptions): StatR
 
   const electiveStats: ElectiveStat[] = breakdown
     ? electivesPresent.map((e) => {
-        const b = basicStats(
-          kept.filter((s) => s.elective === e).map((s) => s.score as number)
-        );
+        const members = kept.filter((s) => s.elective === e);
+        const b = basicStats(members.map((s) => s.score as number));
         return {
           elective: e,
           short: ELECTIVE_SHORT[e],
@@ -178,11 +180,18 @@ export function computeReport(parsed: ParsedResult, options: StatOptions): StatR
           mean: round2(b.mean),
           stdev: round2(b.stdev),
           perfectCount: b.perfectCount,
+          perfectNames: members.filter((s) => s.score === 100).map((s) => s.name),
           maxScore: round2(b.maxScore),
           maxScoreCount: b.maxScoreCount,
         };
       })
     : [];
+
+  // 100점(만점) 학생 이름. 만점자가 없으면 최고점 학생 이름을 대신 보여준다.
+  const perfectNames = kept.filter((s) => s.score === 100).map((s) => s.name);
+  const maxScoreNames = kept
+    .filter((s) => s.score === overall.maxScore)
+    .map((s) => s.name);
 
   // 상위 30% 평균: 점수 내림차순 정렬 후 상위 30% 인원(반올림)
   const sortedDesc = [...scores].sort((a, b) => b - a);
@@ -213,8 +222,10 @@ export function computeReport(parsed: ParsedResult, options: StatOptions): StatR
     mean: round2(overall.mean),
     stdev: round2(overall.stdev),
     perfectCount: overall.perfectCount,
+    perfectNames,
     maxScore: round2(overall.maxScore),
     maxScoreCount: overall.maxScoreCount,
+    maxScoreNames,
     top30Mean: round2(top30Mean),
     top30N,
     conversion,

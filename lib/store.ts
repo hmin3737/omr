@@ -18,6 +18,7 @@ export interface SavedExam {
   fileName: string;
   fileType: string;
   settings: ExamSettings;
+  note: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -28,6 +29,7 @@ interface RawExam {
   fileName: string;
   fileType: string;
   settings: ExamSettings;
+  note?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -35,6 +37,7 @@ interface RawExam {
 function normalize(e: RawExam): SavedExam {
   return {
     ...e,
+    note: e.note ?? "",
     createdAt: new Date(e.createdAt).getTime(),
     updatedAt: new Date(e.updatedAt).getTime(),
   };
@@ -62,11 +65,13 @@ export async function listExams(): Promise<SavedExam[]> {
 export async function createExam(
   name: string,
   file: File,
-  settings: ExamSettings
+  settings: ExamSettings,
+  note: string
 ): Promise<SavedExam> {
   const form = new FormData();
   form.set("name", name);
   form.set("settings", JSON.stringify(settings));
+  form.set("note", note);
   form.set("file", file);
   const res = await fetch("/api/exams", { method: "POST", body: form });
   if (!res.ok) throw new Error(await readError(res));
@@ -76,11 +81,12 @@ export async function createExam(
 /** 기존 시험 수정 (이름/설정/파일 중 전달한 항목만) */
 export async function updateExam(
   id: string,
-  patch: { name?: string; settings?: ExamSettings; file?: File }
+  patch: { name?: string; settings?: ExamSettings; file?: File; note?: string }
 ): Promise<SavedExam> {
   const form = new FormData();
   if (patch.name !== undefined) form.set("name", patch.name);
   if (patch.settings !== undefined) form.set("settings", JSON.stringify(patch.settings));
+  if (patch.note !== undefined) form.set("note", patch.note);
   if (patch.file !== undefined) form.set("file", patch.file);
   const res = await fetch(`/api/exams/${id}`, { method: "PATCH", body: form });
   if (!res.ok) throw new Error(await readError(res));

@@ -43,6 +43,8 @@ const ReportView = forwardRef<HTMLDivElement, { report: StatReport }>(
           {o.top30 && <KV k="상위 30% 평균" v={`${report.top30Mean} (${report.top30N}명)`} />}
         </div>
 
+        {o.perfect && <PerfectNames report={report} />}
+
         <div className="cols">
           <div>
             <div className="section-title">
@@ -124,6 +126,38 @@ const ReportView = forwardRef<HTMLDivElement, { report: StatReport }>(
 const SHORT: Record<number, string> = { 1: "확통", 2: "미적", 3: "기하" };
 function shortLabel(e: number) {
   return SHORT[e] ?? String(e);
+}
+
+/** 100점(만점) 학생 명단. 만점자가 없으면 최고점 학생 명단을 보여준다. */
+function PerfectNames({ report }: { report: StatReport }) {
+  const hasPerfect = report.perfectCount > 0;
+  const title = hasPerfect ? "100점 명단" : `최고점(${report.maxScore}점) 명단`;
+
+  // 선택과목 분리 시 과목별로 나눠서 표기
+  if (report.breakdown && hasPerfect) {
+    const groups = report.electiveStats.filter((es) => es.perfectNames.length > 0);
+    if (!groups.length) return null;
+    return (
+      <div className="names">
+        <div className="names-title">{title}</div>
+        {groups.map((es) => (
+          <div className="names-row" key={es.elective}>
+            <span className="names-tag">{es.short}</span>
+            <span className="names-list">{es.perfectNames.join(", ")}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const names = hasPerfect ? report.perfectNames : report.maxScoreNames;
+  if (!names.length) return null;
+  return (
+    <div className="names">
+      <div className="names-title">{title}</div>
+      <div className="names-list">{names.join(", ")}</div>
+    </div>
+  );
 }
 
 function KV({ k, v }: { k: string; v: string }) {

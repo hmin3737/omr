@@ -33,11 +33,21 @@ function summaryPairs(report: StatReport): [string, string][] {
         STAT_LABELS.perfect,
         `${report.perfectCount}명${bd(report, (es) => es.perfectCount)}`,
       ]);
+      if (report.breakdown) {
+        for (const es of report.electiveStats) {
+          if (es.perfectNames.length)
+            pairs.push([`100점 명단 (${es.short})`, es.perfectNames.join(", ")]);
+        }
+      } else if (report.perfectNames.length) {
+        pairs.push(["100점 명단", report.perfectNames.join(", ")]);
+      }
     } else {
       pairs.push([
         STAT_LABELS.perfect,
         `0명 (최고점 ${report.maxScore}점 · ${report.maxScoreCount}명)`,
       ]);
+      if (report.maxScoreNames.length)
+        pairs.push([`최고점(${report.maxScore}점) 명단`, report.maxScoreNames.join(", ")]);
     }
   }
   if (o.top30) pairs.push([STAT_LABELS.top30, `${report.top30Mean} (상위 ${report.top30N}명)`]);
