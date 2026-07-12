@@ -11,15 +11,25 @@ datasource db {
 }
 
 model Exam {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   name      String
   fileName  String
   fileType  String
   fileData  Bytes // 원본 채점결과 파일 내용
   settings  Json // ExamSettings (cutoff, lowThreshold, electiveStart, selected)
-  note      String  @default("") // 시험 메모
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  note      String      @default("") // 시험 메모
+  classId   String? // 소속 반
+  class     ClassGroup? @relation(fields: [classId], references: [id])
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   @@index([updatedAt])
+}
+
+model ClassGroup {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#2a78d6")
+  createdAt DateTime @default(now())
+  exams     Exam[]
 }

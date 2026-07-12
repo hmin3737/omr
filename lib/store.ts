@@ -11,6 +11,12 @@ export interface ExamSettings {
   selected: Record<StatKey, boolean>;
 }
 
+export interface ClassGroup {
+  id: string;
+  name: string;
+  color: string;
+}
+
 /** 목록/조회용 시험 메타데이터 (파일 내용 미포함) */
 export interface SavedExam {
   id: string;
@@ -19,6 +25,8 @@ export interface SavedExam {
   fileType: string;
   settings: ExamSettings;
   note: string;
+  classId: string | null;
+  class: ClassGroup | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -30,6 +38,8 @@ interface RawExam {
   fileType: string;
   settings: ExamSettings;
   note?: string;
+  classId?: string | null;
+  class?: ClassGroup | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,6 +48,8 @@ function normalize(e: RawExam): SavedExam {
   return {
     ...e,
     note: e.note ?? "",
+    classId: e.classId ?? null,
+    class: e.class ?? null,
     createdAt: new Date(e.createdAt).getTime(),
     updatedAt: new Date(e.updatedAt).getTime(),
   };
@@ -66,32 +78,88 @@ export async function createExam(
   name: string,
   file: File,
   settings: ExamSettings,
-  note: string
+  note: string,
+  classId: string | null
 ): Promise<SavedExam> {
   const form = new FormData();
   form.set("name", name);
   form.set("settings", JSON.stringify(settings));
   form.set("note", note);
+  form.set("classId", classId ?? "");
   form.set("file", file);
   const res = await fetch("/api/exams", { method: "POST", body: form });
   if (!res.ok) throw new Error(await readError(res));
   return normalize(await res.json());
 }
 
-/** 기존 시험 수정 (이름/설정/파일 중 전달한 항목만) */
+/** 기존 시험 수정 (전달한 항목만). classId는 null 전달 시 반 지정 해제. */
 export async function updateExam(
   id: string,
-  patch: { name?: string; settings?: ExamSettings; file?: File; note?: string }
+  patch: {
+    name?: string;
+    settings?: ExamSettings;
+    file?: File;
+    note?: string;
+    classId?: string | null;
+  }
 ): Promise<SavedExam> {
   const form = new FormData();
   if (patch.name !== undefined) form.set("name", patch.name);
   if (patch.settings !== undefined) form.set("settings", JSON.stringify(patch.settings));
   if (patch.note !== undefined) form.set("note", patch.note);
+  if (patch.classId !== undefined) form.set("classId", patch.classId ?? "");
   if (patch.file !== undefined) form.set("file", patch.file);
   const res = await fetch(`/api/exams/${id}`, { method: "PATCH", body: form });
   if (!res.ok) throw new Error(await readError(res));
   return normalize(await res.json());
 }
+
+/** 반 목록 */
+export async function listClasses(): Promise<ClassGroup[]> {
+  const res = await fetch("/api/classes", { cache: "no-store" });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function createClass(name: string, color: string): Promise<ClassGroup> {
+  const res = await fetch("/api/classes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, color }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function updateClass(
+  id: string,
+  patch: { name?: string; color?: string }
+): Promise<ClassGroup> {
+  const res = await fetch(`/api/classes/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export async function deleteClass(id: string): Promise<void> {
+  const res = await fetch(`/api/classes/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await readError(res));
+}
+
+/** 카테고리 팔레트 (반 색상 선택지) */
+export const CLASS_COLORS = [
+  "#2a78d6",
+  "#1baf7a",
+  "#eda100",
+  "#008300",
+  "#4a3aa7",
+  "#e34948",
+  "#e87ba4",
+  "#eb6834",
+];
 
 export async function deleteExam(id: string): Promise<void> {
   const res = await fetch(`/api/exams/${id}`, { method: "DELETE" });

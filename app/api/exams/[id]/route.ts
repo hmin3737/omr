@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { EXAM_META_SELECT } from "@/lib/exam-select";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const META_SELECT = {
-  id: true,
-  name: true,
-  fileName: true,
-  fileType: true,
-  settings: true,
-  note: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
 
 // 이름 / 설정 / 원본 파일 부분 수정 (multipart/form-data)
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -35,6 +25,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const note = form.get("note");
     if (note !== null) data.note = String(note);
 
+    const classId = form.get("classId");
+    if (classId !== null) {
+      const v = String(classId);
+      data.class = v ? { connect: { id: v } } : { disconnect: true };
+    }
+
     const file = form.get("file");
     if (file instanceof File) {
       data.fileName = file.name;
@@ -45,7 +41,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const updated = await prisma.exam.update({
       where: { id: params.id },
       data,
-      select: META_SELECT,
+      select: EXAM_META_SELECT,
     });
     return NextResponse.json(updated);
   } catch (e) {

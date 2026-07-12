@@ -6,14 +6,21 @@ import { computeReport, type StatKey, type StatReport } from "@/lib/stats";
 import { buildXlsx, buildPdf } from "@/lib/export";
 import {
   createExam,
+  createClass,
+  deleteClass,
   deleteExam,
   downloadExamFile,
   fetchExamFile,
+  listClasses,
   listExams,
+  updateClass,
   updateExam,
+  CLASS_COLORS,
+  type ClassGroup,
   type ExamSettings,
   type SavedExam,
 } from "@/lib/store";
+import Link from "next/link";
 import { CHANGELOG, LATEST } from "@/lib/changelog";
 import ReportView from "./ReportView";
 
@@ -53,12 +60,15 @@ function fmtDate(ts: number): string {
 export default function Home() {
   const [examName, setExamName] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [cutoff, setCutoff] = useState("");
+  const [cutoff, setCutoff] = useState("50");
   const [lowThreshold, setLowThreshold] = useState("50");
   const [electiveStart, setElectiveStart] = useState("23");
   const [note, setNote] = useState("");
+  const [classId, setClassId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<StatKey, boolean>>(DEFAULT_SELECTED);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [classes, setClasses] = useState<ClassGroup[]>([]);
+  const [showClasses, setShowClasses] = useState(false);
   const [report, setReport] = useState<StatReport | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,13 +85,22 @@ export default function Home() {
 
   useEffect(() => {
     refreshExams();
+    refreshClasses();
   }, []);
 
   async function refreshExams() {
     try {
       setExams(await listExams());
     } catch {
-      /* IndexedDB 사용 불가 환경은 무시 */
+      /* 목록 조회 실패는 무시 */
+    }
+  }
+
+  async function refreshClasses() {
+    try {
+      setClasses(await listClasses());
+    } catch {
+      /* 무시 */
     }
   }
 
@@ -144,10 +163,11 @@ export default function Home() {
           note,
         };
         if (file) patch.file = file;
+        patch.classId = classId;
         await updateExam(currentExam.id, patch);
         setNotice("시험을 갱신했습니다.");
       } else {
-        const created = await createExam(examName.trim(), file as File, settings, note);
+        const created = await createExam(examName.trim(), file as File, settings, note, classId);
         setCurrentId(created.id);
         setNotice("시험을 저장했습니다.");
       }
@@ -170,6 +190,7 @@ export default function Home() {
       setLowThreshold(exam.settings.lowThreshold);
       setElectiveStart(exam.settings.electiveStart ?? "23");
       setNote(exam.note ?? "");
+      setClassId(exam.classId ?? null);
       setSelected(exam.settings.selected);
       setCurrentId(exam.id);
       const f = await fetchExamFile(exam);
@@ -249,10 +270,11 @@ export default function Home() {
     setCurrentId(null);
     setExamName("");
     setFile(null);
-    setCutoff("");
+    setCutoff("50");
     setLowThreshold("50");
     setElectiveStart("23");
     setNote("");
+    setClassId(null);
     setSelected(DEFAULT_SELECTED);
     setReport(null);
     setError("");
@@ -271,12 +293,27 @@ export default function Home() {
           <span className="banner-title">{LATEST.title}</span>
           <span className="banner-date">{LATEST.date}</span>
         </div>
-        <button className="banner-btn" onClick={() => setShowChangelog(true)}>
-          패치 노트
-        </button>
+        <div className="banner-actions">
+          <Link href="/trends" className="banner-btn ghost">
+            반별 추세
+          </Link>
+          <button className="banner-btn" onClick={() => setShowChangelog(true)}>
+            패치 노트
+          </button>
+        </div>
       </div>
 
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+      {showClasses && (
+        <ClassesModal
+          classes={classes}
+          onClose={() => setShowClasses(false)}
+          onChanged={async () => {
+            await refreshClasses();
+            await refreshExams();
+          }}
+        />
+      )}
 
       <h1>OMR 통계 생성기</h1>
       <p className="sub">
@@ -313,6 +350,27 @@ export default function Home() {
               onChange={(e) => setExamName(e.target.value)}
               placeholder="예: 2026 1학기 중간고사 수학"
             />
+          </div>
+
+          <div className="field">
+            <label className="lab">반 (선택)</label>
+            <div className="class-row">
+              <select
+                className="class-select"
+                value={classId ?? ""}
+                onChange={(e) => setClassId(e.target.value || null)}
+              >
+                <option value="">반 없음</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="btn-mini" onClick={() => setShowClasses(true)}>
+                반 관리
+              </button>
+            </div>
           </div>
 
           <div className="field">
@@ -442,7 +500,17 @@ export default function Home() {
                 {exams.map((ex) => (
                   <li key={ex.id} className={ex.id === currentId ? "exam-item active" : "exam-item"}>
                     <div className="exam-info">
-                      <span className="exam-name">{ex.name}</span>
+                      <span className="exam-name">
+                        {ex.class && (
+                          <span
+                            className="class-badge"
+                            style={{ background: ex.class.color }}
+                          >
+                            {ex.class.name}
+                          </span>
+                        )}
+                        {ex.name}
+                      </span>
                       <span className="exam-meta">
                         {ex.fileName} · 수정 {fmtDate(ex.updatedAt)}
                       </span>
@@ -495,6 +563,119 @@ function ChangelogModal({ onClose }: { onClose: () => void }) {
               </ul>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClassesModal({
+  classes,
+  onClose,
+  onChanged,
+}: {
+  classes: ClassGroup[];
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [color, setColor] = useState(CLASS_COLORS[0]);
+  const [err, setErr] = useState("");
+
+  async function add() {
+    setErr("");
+    if (!name.trim()) return setErr("반 이름을 입력하세요.");
+    try {
+      await createClass(name.trim(), color);
+      setName("");
+      await onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "생성 실패");
+    }
+  }
+
+  async function rename(c: ClassGroup) {
+    const next = window.prompt("새 반 이름", c.name);
+    if (next === null || !next.trim()) return;
+    await updateClass(c.id, { name: next.trim() });
+    await onChanged();
+  }
+
+  async function recolor(c: ClassGroup, col: string) {
+    await updateClass(c.id, { color: col });
+    await onChanged();
+  }
+
+  async function remove(c: ClassGroup) {
+    if (!window.confirm(`"${c.name}" 반을 삭제할까요? 이 반의 시험들은 '반 없음'이 됩니다.`)) return;
+    await deleteClass(c.id);
+    await onChanged();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>반 관리</h2>
+          <button className="modal-close" onClick={onClose} aria-label="닫기">
+            ×
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="class-add">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="새 반 이름 (예: 3학년 2반)"
+            />
+            <div className="swatches">
+              {CLASS_COLORS.map((col) => (
+                <button
+                  key={col}
+                  type="button"
+                  className={col === color ? "swatch active" : "swatch"}
+                  style={{ background: col }}
+                  onClick={() => setColor(col)}
+                  aria-label={col}
+                />
+              ))}
+            </div>
+            <button className="btn" onClick={add}>
+              반 추가
+            </button>
+            {err && <div className="error">{err}</div>}
+          </div>
+
+          {classes.length > 0 && (
+            <ul className="class-list">
+              {classes.map((c) => (
+                <li key={c.id} className="class-item">
+                  <span className="class-badge" style={{ background: c.color }}>
+                    {c.name}
+                  </span>
+                  <div className="swatches sm">
+                    {CLASS_COLORS.map((col) => (
+                      <button
+                        key={col}
+                        type="button"
+                        className={col === c.color ? "swatch active" : "swatch"}
+                        style={{ background: col }}
+                        onClick={() => recolor(c, col)}
+                        aria-label={col}
+                      />
+                    ))}
+                  </div>
+                  <div className="class-item-actions">
+                    <button onClick={() => rename(c)}>이름변경</button>
+                    <button className="danger" onClick={() => remove(c)}>
+                      삭제
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

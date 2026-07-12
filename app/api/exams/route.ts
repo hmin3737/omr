@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { EXAM_META_SELECT } from "@/lib/exam-select";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,27 +9,19 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const exams = await prisma.exam.findMany({
     orderBy: { updatedAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      fileName: true,
-      fileType: true,
-      settings: true,
-      note: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: EXAM_META_SELECT,
   });
   return NextResponse.json(exams);
 }
 
-// 새 시험 저장 (multipart/form-data: name, settings(JSON), file)
+// 새 시험 저장 (multipart/form-data: name, settings(JSON), note, classId, file)
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const name = String(form.get("name") ?? "").trim();
     const settingsRaw = String(form.get("settings") ?? "");
     const note = String(form.get("note") ?? "");
+    const classId = String(form.get("classId") ?? "");
     const file = form.get("file");
 
     if (!name) return NextResponse.json({ error: "시험명이 필요합니다." }, { status: 400 });
@@ -46,17 +39,9 @@ export async function POST(req: Request) {
         fileData: buf,
         settings,
         note,
+        classId: classId || null,
       },
-      select: {
-        id: true,
-        name: true,
-        fileName: true,
-        fileType: true,
-        settings: true,
-        note: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: EXAM_META_SELECT,
     });
     return NextResponse.json(created, { status: 201 });
   } catch (e) {

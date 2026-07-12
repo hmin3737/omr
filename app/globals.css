@@ -522,3 +522,225 @@ textarea.memo:focus {
   font-size: 13px;
   word-break: break-all;
 }
+
+/* ---- 배너 액션 / trends 링크 ---- */
+.banner-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.banner-btn.ghost {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---- 반 선택 / 관리 ---- */
+.class-row {
+  display: flex;
+  gap: 8px;
+}
+.class-select {
+  flex: 1;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+}
+.btn-mini {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-mini:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.class-badge {
+  display: inline-block;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.class-add {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed var(--border);
+}
+.class-add input[type="text"] {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.swatches {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.swatch.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px #fff inset;
+}
+.swatches.sm .swatch {
+  width: 18px;
+  height: 18px;
+}
+.class-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+}
+.class-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.class-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.class-item-actions button {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.class-item-actions button.danger:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+/* ---- 통계 타일 ---- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.tile {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fbfcfe;
+}
+.tile-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.tile-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tile-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ---- 넓은 표 (세로글자 방지) ---- */
+table.wide {
+  margin-bottom: 8px;
+  table-layout: auto;
+}
+table.wide th,
+table.wide td {
+  white-space: nowrap;
+  padding: 7px 12px;
+  font-variant-numeric: tabular-nums;
+}
+table.wide td.q {
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* ---- trends 페이지 ---- */
+.trends-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.trends-head .banner-btn.ghost {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.legend-item.off {
+  opacity: 0.4;
+}
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.chart-wrap {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.chart {
+  width: 100%;
+  height: auto;
+}
+.chart .grid {
+  stroke: #e1e0d9;
+  stroke-width: 1;
+}
+.chart .tick {
+  fill: #898781;
+  font-size: 12px;
+}
+.chart .line-label {
+  font-size: 12px;
+  font-weight: 600;
+}
