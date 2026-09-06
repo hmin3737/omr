@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { EXAM_META_SELECT } from "@/lib/exam-select";
+import { MAX_UPLOAD_BYTES, tooLargeResponse } from "@/lib/upload-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,10 +34,25 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const file = form.get("file");
     if (file instanceof File) {
+      if (file.size > MAX_UPLOAD_BYTES) return tooLargeResponse();
       data.fileName = file.name;
       data.fileType = file.type;
       data.fileData = Buffer.from(await file.arrayBuffer());
     }
+
+    const sourceType = form.get("sourceType");
+    if (sourceType !== null) data.sourceType = String(sourceType);
+
+    const rawFile = form.get("rawFile");
+    if (rawFile instanceof File) {
+      if (rawFile.size > MAX_UPLOAD_BYTES) return tooLargeResponse();
+      data.rawFileName = rawFile.name;
+      data.rawFileType = rawFile.type;
+      data.rawFileData = Buffer.from(await rawFile.arrayBuffer());
+    }
+
+    const answerKeyRaw = form.get("answerKey");
+    if (answerKeyRaw !== null) data.answerKey = JSON.parse(String(answerKeyRaw));
 
     const updated = await prisma.exam.update({
       where: { id: params.id },

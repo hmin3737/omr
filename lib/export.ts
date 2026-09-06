@@ -54,8 +54,7 @@ function summaryPairs(report: StatReport): [string, string][] {
   return pairs;
 }
 
-export function buildXlsx(report: StatReport): void {
-  const wb = XLSX.utils.book_new();
+function buildStatAoa(report: StatReport): (string | number)[][] {
   const aoa: (string | number)[][] = [];
 
   aoa.push([`${report.examName} 통계 자료`]);
@@ -116,10 +115,34 @@ export function buildXlsx(report: StatReport): void {
     }
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  return aoa;
+}
+
+function buildStatSheet(report: StatReport): XLSX.WorkSheet {
+  const ws = XLSX.utils.aoa_to_sheet(buildStatAoa(report));
   ws["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 10 }];
-  XLSX.utils.book_append_sheet(wb, ws, "통계");
+  return ws;
+}
+
+export function buildXlsx(report: StatReport): void {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, buildStatSheet(report), "통계");
   XLSX.writeFile(wb, `${sanitize(report.examName)}_통계.xlsx`);
+}
+
+/** 이메일 첨부용: 통계 xlsx를 base64로 반환 */
+export function statXlsxBase64(report: StatReport): { base64: string; filename: string; mimeType: string } {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, buildStatSheet(report), "통계");
+  const buf: ArrayBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  let binary = "";
+  const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return {
+    base64: btoa(binary),
+    filename: `${sanitize(report.examName)}_통계.xlsx`,
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  };
 }
 
 export async function buildPdf(el: HTMLElement, report: StatReport): Promise<void> {
@@ -145,6 +168,6 @@ export async function buildPdf(el: HTMLElement, report: StatReport): Promise<voi
   pdf.save(`${sanitize(report.examName)}_통계.pdf`);
 }
 
-function sanitize(name: string): string {
+export function sanitize(name: string): string {
   return (name || "통계자료").replace(/[\\/:*?"<>|]/g, "_").trim();
 }

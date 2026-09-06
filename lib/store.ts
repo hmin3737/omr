@@ -3,6 +3,7 @@
 // 파일 내용은 필요할 때(통계 재생성·다운로드) API로 따로 가져온다.
 
 import type { StatKey } from "./stats";
+import type { AnswerKeyPayload } from "./rawAnswers";
 
 export interface ExamSettings {
   cutoff: string;
@@ -17,6 +18,8 @@ export interface ClassGroup {
   color: string;
 }
 
+export type ExamSourceType = "graded" | "raw";
+
 /** 목록/조회용 시험 메타데이터 (파일 내용 미포함) */
 export interface SavedExam {
   id: string;
@@ -27,6 +30,10 @@ export interface SavedExam {
   note: string;
   classId: string | null;
   class: ClassGroup | null;
+  sourceType: ExamSourceType;
+  rawFileName: string | null;
+  rawFileType: string | null;
+  answerKey: AnswerKeyPayload | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -40,6 +47,10 @@ interface RawExam {
   note?: string;
   classId?: string | null;
   class?: ClassGroup | null;
+  sourceType?: ExamSourceType;
+  rawFileName?: string | null;
+  rawFileType?: string | null;
+  answerKey?: AnswerKeyPayload | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +61,10 @@ function normalize(e: RawExam): SavedExam {
     note: e.note ?? "",
     classId: e.classId ?? null,
     class: e.class ?? null,
+    sourceType: e.sourceType ?? "graded",
+    rawFileName: e.rawFileName ?? null,
+    rawFileType: e.rawFileType ?? null,
+    answerKey: e.answerKey ?? null,
     createdAt: new Date(e.createdAt).getTime(),
     updatedAt: new Date(e.updatedAt).getTime(),
   };
@@ -73,13 +88,19 @@ export async function listExams(): Promise<SavedExam[]> {
   return data.map(normalize);
 }
 
-/** 새 시험 저장 */
+export interface RawExamInput {
+  rawFile: File;
+  answerKey: AnswerKeyPayload;
+}
+
+/** 새 시험 저장. raw를 넘기면 "학생답안" 모드 시험으로 저장(원본 응답 + 채점 키 스냅샷 함께 보관). */
 export async function createExam(
   name: string,
   file: File,
   settings: ExamSettings,
   note: string,
-  classId: string | null
+  classId: string | null,
+  raw?: RawExamInput
 ): Promise<SavedExam> {
   const form = new FormData();
   form.set("name", name);
@@ -87,6 +108,11 @@ export async function createExam(
   form.set("note", note);
   form.set("classId", classId ?? "");
   form.set("file", file);
+  if (raw) {
+    form.set("sourceType", "raw");
+    form.set("rawFile", raw.rawFile);
+    form.set("answerKey", JSON.stringify(raw.answerKey));
+  }
   const res = await fetch("/api/exams", { method: "POST", body: form });
   if (!res.ok) throw new Error(await readError(res));
   return normalize(await res.json());
@@ -101,6 +127,8 @@ export async function updateExam(
     file?: File;
     note?: string;
     classId?: string | null;
+    rawFile?: File;
+    answerKey?: AnswerKeyPayload;
   }
 ): Promise<SavedExam> {
   const form = new FormData();
@@ -109,6 +137,11 @@ export async function updateExam(
   if (patch.note !== undefined) form.set("note", patch.note);
   if (patch.classId !== undefined) form.set("classId", patch.classId ?? "");
   if (patch.file !== undefined) form.set("file", patch.file);
+  if (patch.rawFile !== undefined) {
+    form.set("sourceType", "raw");
+    form.set("rawFile", patch.rawFile);
+  }
+  if (patch.answerKey !== undefined) form.set("answerKey", JSON.stringify(patch.answerKey));
   const res = await fetch(`/api/exams/${id}`, { method: "PATCH", body: form });
   if (!res.ok) throw new Error(await readError(res));
   return normalize(await res.json());
@@ -182,4 +215,63 @@ export function downloadExamFile(exam: SavedExam): void {
   document.body.appendChild(a);
   a.click();
   a.remove();
+}
+
+/** 학생답안(raw) 원본을 File 객체로 가져온다 (재로딩용) */
+export async function fetchExamRawFile(exam: SavedExam): Promise<File> {
+  const res = await fetch(`/api/exams/${exam.id}/rawfile`, { cache: "no-store" });
+  if (!res.ok) throw new Error(await readError(res));
+  const blob = await res.blob();
+  return new File([blob], exam.rawFileName ?? "학생답안", { type: exam.rawFileType ?? "" });
+}
+
+/** 학생답안(raw) 원본 내려받기 */
+export function downloadExamRawFile(exam: SavedExam): void {
+  const a = document.createElement("a");
+  a.href = `/api/exams/${exam.id}/rawfile?download=1`;
+  a.download = exam.rawFileName || "학생답안";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/** 정답 템플릿 목록 (payload 미포함, 이름 검색/선택용) */
+export interface AnswerKeyTemplateMeta {
+  id: string;
+  name: string;
+  updatedAt: number;
+}
+
+export async function listAnswerKeyTemplates(): Promise<AnswerKeyTemplateMeta[]> {
+  const res = await fetch("/api/answer-keys", { cache: "no-store" });
+  if (!res.ok) throw new Error(await readError(res));
+  const data: { id: string; name: string; updatedAt: string }[] = await res.json();
+  return data.map((t) => ({ ...t, updatedAt: new Date(t.updatedAt).getTime() }));
+}
+
+export async function loadAnswerKeyTemplate(id: string): Promise<AnswerKeyPayload> {
+  const res = await fetch(`/api/answer-keys/${id}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(await readError(res));
+  const data = await res.json();
+  return data.payload as AnswerKeyPayload;
+}
+
+/** 이름 기준 upsert — 같은 이름의 템플릿이 있으면 갱신한다 */
+export async function saveAnswerKeyTemplate(
+  name: string,
+  payload: AnswerKeyPayload
+): Promise<AnswerKeyTemplateMeta> {
+  const res = await fetch("/api/answer-keys", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, payload }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  const data = await res.json();
+  return { ...data, updatedAt: new Date(data.updatedAt).getTime() };
+}
+
+export async function deleteAnswerKeyTemplate(id: string): Promise<void> {
+  const res = await fetch(`/api/answer-keys/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await readError(res));
 }

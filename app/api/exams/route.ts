@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { EXAM_META_SELECT } from "@/lib/exam-select";
+import { MAX_UPLOAD_BYTES, tooLargeResponse } from "@/lib/upload-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,8 @@ export async function GET() {
   return NextResponse.json(exams);
 }
 
-// 새 시험 저장 (multipart/form-data: name, settings(JSON), note, classId, file)
+// 새 시험 저장 (multipart/form-data: name, settings(JSON), note, classId, file,
+// + 학생답안 모드: sourceType="raw", rawFile, answerKey(JSON) — file 은 채점 완료된 표준 채점결과)
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
@@ -23,10 +25,15 @@ export async function POST(req: Request) {
     const note = String(form.get("note") ?? "");
     const classId = String(form.get("classId") ?? "");
     const file = form.get("file");
+    const sourceType = String(form.get("sourceType") ?? "graded");
+    const rawFile = form.get("rawFile");
+    const answerKeyRaw = form.get("answerKey");
 
     if (!name) return NextResponse.json({ error: "시험명이 필요합니다." }, { status: 400 });
     if (!(file instanceof File))
       return NextResponse.json({ error: "파일이 필요합니다." }, { status: 400 });
+    if (file.size > MAX_UPLOAD_BYTES) return tooLargeResponse();
+    if (rawFile instanceof File && rawFile.size > MAX_UPLOAD_BYTES) return tooLargeResponse();
 
     const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
     const buf = Buffer.from(await file.arrayBuffer());
@@ -40,6 +47,15 @@ export async function POST(req: Request) {
         settings,
         note,
         classId: classId || null,
+        sourceType,
+        ...(rawFile instanceof File
+          ? {
+              rawFileName: rawFile.name,
+              rawFileType: rawFile.type,
+              rawFileData: Buffer.from(await rawFile.arrayBuffer()),
+            }
+          : {}),
+        ...(answerKeyRaw ? { answerKey: JSON.parse(String(answerKeyRaw)) } : {}),
       },
       select: EXAM_META_SELECT,
     });

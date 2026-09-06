@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { ParsedResult, StudentRecord } from "./stats";
+import { readWorkbookFile } from "./workbook";
 
 // 채점결과 파일 구조 (OMR 출력)
 //   행 0: 헤더  [성명, 수험번호, 선택, 점수, 1, 2, 3, ... , 단16, ...]
@@ -14,8 +15,7 @@ const ELECTIVE_KEYS = ["선택", "선택과목"]; // 1=확통, 2=미적, 3=기�
 const META_KEYS = ["선택", "선택과목", "구분", "반"]; // 문항이 아닌 부가 컬럼
 
 export async function parseFile(file: File, examName: string): Promise<ParsedResult> {
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
+  const wb = await readWorkbookFile(file);
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
     header: 1,

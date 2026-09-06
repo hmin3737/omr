@@ -3,14 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import { parseFile } from "@/lib/parse";
 import { computeReport, type StatKey, type StatReport } from "@/lib/stats";
-import { buildXlsx, buildPdf } from "@/lib/export";
+import { buildXlsx, buildPdf, statXlsxBase64 } from "@/lib/export";
+import {
+  parseRawAnswers,
+  gradeRawAnswers,
+  gradedToParsedResult,
+  buildDefaultAnswerKey,
+  type AnswerKeyPayload,
+  type GradingResult,
+} from "@/lib/rawAnswers";
+import {
+  downloadGradedResult,
+  downloadQuestionAnalysis,
+  gradedResultBase64,
+  questionAnalysisBase64,
+  gradedResultToFile,
+} from "@/lib/gradingExport";
 import {
   createExam,
   createClass,
   deleteClass,
   deleteExam,
   downloadExamFile,
+  downloadExamRawFile,
   fetchExamFile,
+  fetchExamRawFile,
   listClasses,
   listExams,
   updateClass,
@@ -23,6 +40,10 @@ import {
 import Link from "next/link";
 import { CHANGELOG, LATEST } from "@/lib/changelog";
 import ReportView from "./ReportView";
+import AnswerKeyGrid from "./AnswerKeyGrid";
+import EmailButton from "./EmailButton";
+
+type Mode = "graded" | "raw";
 
 const STAT_ITEMS: { key: StatKey; label: string }[] = [
   { key: "count", label: "응시자수" },
@@ -58,8 +79,13 @@ function fmtDate(ts: number): string {
 }
 
 export default function Home() {
+  const [mode, setMode] = useState<Mode>("graded");
   const [examName, setExamName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [rawFile, setRawFile] = useState<File | null>(null);
+  const [answerKey, setAnswerKey] = useState<AnswerKeyPayload>(() => buildDefaultAnswerKey(30, 23));
+  const [templateName, setTemplateName] = useState("");
+  const [gradingResult, setGradingResult] = useState<GradingResult | null>(null);
   const [cutoff, setCutoff] = useState("50");
   const [lowThreshold, setLowThreshold] = useState("50");
   const [electiveStart, setElectiveStart] = useState("23");
@@ -75,6 +101,7 @@ export default function Home() {
 
   // 저장된 시험 관리
   const [exams, setExams] = useState<SavedExam[]>([]);
+  const [examsLoading, setExamsLoading] = useState(true);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const reportRef = useRef<HTMLDivElement>(null);
@@ -93,6 +120,8 @@ export default function Home() {
       setExams(await listExams());
     } catch {
       /* 목록 조회 실패는 무시 */
+    } finally {
+      setExamsLoading(false);
     }
   }
 
@@ -127,14 +156,49 @@ export default function Home() {
     })();
   }
 
+  // 학생답안 + 정답키로 채점하고, 기존 computeReport 를 그대로 재사용해 리포트를 만든다.
+  async function runRawGrading(): Promise<{ report: StatReport; result: GradingResult }> {
+    if (!rawFile) throw new Error("학생답안 파일을 올리세요.");
+    const parsed = await parseRawAnswers(rawFile, examName.trim());
+    const result = gradeRawAnswers(parsed, answerKey);
+    const parsedResult = gradedToParsedResult(result);
+    const cutoffNum = cutoff.trim() === "" || Number.isNaN(Number(cutoff)) ? null : Number(cutoff);
+    const rep = computeReport(parsedResult, {
+      cutoff: cutoffNum,
+      selected,
+      lowAccuracyThreshold: Number(lowThreshold),
+      electiveStart: answerKey.electiveStart,
+    });
+    if (rep.count === 0)
+      throw new Error("분석 대상 인원이 0명입니다. 허수 제거 기준을 확인하세요.");
+    return { report: rep, result };
+  }
+
   async function handleGenerate() {
     setError("");
     setNotice("");
     if (!examName.trim()) return setError("시험명을 입력하세요.");
-    if (!file) return setError("채점결과 파일을 올리세요.");
     if (lowThreshold.trim() === "" || Number.isNaN(Number(lowThreshold)))
       return setError("정답률 낮은 문제의 기준(%)을 입력하세요.");
 
+    if (mode === "raw") {
+      if (!rawFile) return setError("학생답안 파일을 올리세요.");
+      setBusy(true);
+      try {
+        const { report: rep, result } = await runRawGrading();
+        setGradingResult(result);
+        setReport(rep);
+      } catch (e) {
+        setReport(null);
+        setGradingResult(null);
+        setError(e instanceof Error ? e.message : "채점 중 오류가 발생했습니다.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    if (!file) return setError("채점결과 파일을 올리세요.");
     setBusy(true);
     try {
       setReport(await buildReport(file, examName.trim()));
@@ -151,6 +215,49 @@ export default function Home() {
     setError("");
     setNotice("");
     if (!examName.trim()) return setError("시험명을 입력하세요.");
+
+    if (mode === "raw") {
+      if (!rawFile) return setError("학생답안 파일을 올리세요.");
+      setBusy(true);
+      try {
+        const { report: rep, result } = await runRawGrading();
+        setGradingResult(result);
+        setReport(rep);
+        const gradedFile = gradedResultToFile(result);
+        const settings: ExamSettings = {
+          cutoff,
+          lowThreshold,
+          electiveStart: String(answerKey.electiveStart),
+          selected,
+        };
+        if (currentExam) {
+          await updateExam(currentExam.id, {
+            name: examName.trim(),
+            settings,
+            note,
+            classId,
+            file: gradedFile,
+            rawFile,
+            answerKey,
+          });
+          setNotice("시험을 갱신했습니다.");
+        } else {
+          const created = await createExam(examName.trim(), gradedFile, settings, note, classId, {
+            rawFile,
+            answerKey,
+          });
+          setCurrentId(created.id);
+          setNotice("시험을 저장했습니다.");
+        }
+        await refreshExams();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "저장 중 오류가 발생했습니다.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     if (!file && !currentExam) return setError("채점결과 파일을 올리세요.");
 
     setBusy(true);
@@ -193,6 +300,38 @@ export default function Home() {
       setClassId(exam.classId ?? null);
       setSelected(exam.settings.selected);
       setCurrentId(exam.id);
+
+      if (exam.sourceType === "raw" && exam.answerKey) {
+        setMode("raw");
+        setFile(null);
+        setAnswerKey(exam.answerKey);
+        setTemplateName(exam.name);
+        const rf = await fetchExamRawFile(exam);
+        setRawFile(rf);
+
+        const parsed = await parseRawAnswers(rf, exam.name);
+        const result = gradeRawAnswers(parsed, exam.answerKey);
+        setGradingResult(result);
+        const parsedResult = gradedToParsedResult(result);
+        const cutoffNum =
+          exam.settings.cutoff.trim() === "" || Number.isNaN(Number(exam.settings.cutoff))
+            ? null
+            : Number(exam.settings.cutoff);
+        const rep = computeReport(parsedResult, {
+          cutoff: cutoffNum,
+          selected: exam.settings.selected,
+          lowAccuracyThreshold: Number(exam.settings.lowThreshold) || 0,
+          electiveStart: exam.answerKey.electiveStart,
+        });
+        setReport(rep.count === 0 ? null : rep);
+        if (rep.count === 0) setError("분석 대상 인원이 0명입니다. 허수 제거 기준을 확인하세요.");
+        else setNotice(`"${exam.name}" 시험을 불러왔습니다.`);
+        return;
+      }
+
+      setMode("graded");
+      setRawFile(null);
+      setGradingResult(null);
       const f = await fetchExamFile(exam);
       setFile(f);
 
@@ -270,6 +409,11 @@ export default function Home() {
     setCurrentId(null);
     setExamName("");
     setFile(null);
+    setMode("graded");
+    setRawFile(null);
+    setAnswerKey(buildDefaultAnswerKey(30, 23));
+    setTemplateName("");
+    setGradingResult(null);
     setCutoff("50");
     setLowThreshold("50");
     setElectiveStart("23");
@@ -283,6 +427,11 @@ export default function Home() {
 
   async function handlePdf() {
     if (report && reportRef.current) await buildPdf(reportRef.current, report);
+  }
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
   }
 
   return (
@@ -299,6 +448,9 @@ export default function Home() {
           </Link>
           <button className="banner-btn" onClick={() => setShowChangelog(true)}>
             패치 노트
+          </button>
+          <button className="banner-btn ghost" onClick={handleLogout}>
+            로그아웃
           </button>
         </div>
       </div>
@@ -340,6 +492,23 @@ export default function Home() {
             </div>
           )}
 
+          <div className="mode-tabs">
+            <button
+              type="button"
+              className={mode === "graded" ? "mode-tab active" : "mode-tab"}
+              onClick={() => setMode("graded")}
+            >
+              채점결과 업로드
+            </button>
+            <button
+              type="button"
+              className={mode === "raw" ? "mode-tab active" : "mode-tab"}
+              onClick={() => setMode("raw")}
+            >
+              학생답안 업로드
+            </button>
+          </div>
+
           <div className="field">
             <label className="lab">
               시험명 <span className="req">*</span>
@@ -373,21 +542,50 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="field">
-            <label className="lab">
-              채점결과 파일 {!currentExam && <span className="req">*</span>}
-            </label>
-            <input
-              type="file"
-              accept=".xls,.xlsx,.csv"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-            <p className="hint">
-              {currentExam
-                ? "비워두면 저장된 원본 파일을 그대로 사용합니다. 새 파일을 올리면 교체됩니다."
-                : "xlsx만 지원. 데이터는 브라우저 안에서만 처리됩니다."}
-            </p>
-          </div>
+          {mode === "graded" ? (
+            <div className="field">
+              <label className="lab">
+                채점결과 파일 {!currentExam && <span className="req">*</span>}
+              </label>
+              <input
+                type="file"
+                accept=".xls,.xlsx,.csv"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="hint">
+                {currentExam
+                  ? "비워두면 저장된 원본 파일을 그대로 사용합니다. 새 파일을 올리면 교체됩니다."
+                  : "xlsx만 지원. 데이터는 브라우저 안에서만 처리됩니다."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="field">
+                <label className="lab">
+                  학생답안 파일 {!rawFile && <span className="req">*</span>}
+                </label>
+                <input
+                  type="file"
+                  accept=".xls,.xlsx,.csv"
+                  onChange={(e) => setRawFile(e.target.files?.[0] ?? null)}
+                />
+                <p className="hint">
+                  성명·수험번호(또는 전화번호)·선택과목코드 + 문항별 원본 응답 구조의 파일입니다.
+                  데이터는 브라우저 안에서만 처리됩니다.
+                </p>
+              </div>
+
+              <div className="field">
+                <label className="lab">문항별 배점 · 정답</label>
+                <AnswerKeyGrid
+                  value={answerKey}
+                  onChange={setAnswerKey}
+                  templateName={templateName}
+                  onTemplateNameChange={setTemplateName}
+                />
+              </div>
+            </>
+          )}
 
           <div className="field">
             <label className="lab">허수 표본 제거 기준 (선택)</label>
@@ -400,19 +598,21 @@ export default function Home() {
             <p className="hint">입력한 점수 이하의 응시자를 통계에서 제외합니다.</p>
           </div>
 
-          <div className="field">
-            <label className="lab">선택과목 시작 문항 번호 (선택)</label>
-            <input
-              type="number"
-              value={electiveStart}
-              onChange={(e) => setElectiveStart(e.target.value)}
-              placeholder="예: 23 → 23번부터 선택과목 문항"
-            />
-            <p className="hint">
-              이 번호 이상의 문항은 선택과목별로 분리되어 <b>미적30</b>처럼 표기되고, 응시하지 않은
-              과목은 <b>-</b>로 표시됩니다. 비우면 적용하지 않습니다.
-            </p>
-          </div>
+          {mode === "graded" && (
+            <div className="field">
+              <label className="lab">선택과목 시작 문항 번호 (선택)</label>
+              <input
+                type="number"
+                value={electiveStart}
+                onChange={(e) => setElectiveStart(e.target.value)}
+                placeholder="예: 23 → 23번부터 선택과목 문항"
+              />
+              <p className="hint">
+                이 번호 이상의 문항은 선택과목별로 분리되어 <b>미적30</b>처럼 표기되고, 응시하지 않은
+                과목은 <b>-</b>로 표시됩니다. 비우면 적용하지 않습니다.
+              </p>
+            </div>
+          )}
 
           <div className="field">
             <label className="lab">
@@ -469,6 +669,49 @@ export default function Home() {
               <button className="btn secondary" onClick={handlePdf}>
                 pdf 내려받기
               </button>
+              <EmailButton getAttachment={() => statXlsxBase64(report)} />
+            </div>
+          )}
+
+          {mode === "raw" && gradingResult && (
+            <div className="export-group">
+              <div className="export-row">
+                <span className="export-label">채점결과</span>
+                <button className="btn-mini" onClick={() => downloadGradedResult(gradingResult, "xls")}>
+                  xls
+                </button>
+                <button className="btn-mini" onClick={() => downloadGradedResult(gradingResult, "csv")}>
+                  csv
+                </button>
+                <EmailButton getAttachment={() => gradedResultBase64(gradingResult, "xls")} />
+              </div>
+              <div className="export-row">
+                <span className="export-label">문항분석</span>
+                <button className="btn-mini" onClick={() => downloadQuestionAnalysis(gradingResult, "xls")}>
+                  xls
+                </button>
+                <button className="btn-mini" onClick={() => downloadQuestionAnalysis(gradingResult, "csv")}>
+                  csv
+                </button>
+                <EmailButton getAttachment={() => questionAnalysisBase64(gradingResult, "xls")} />
+              </div>
+              {rawFile && (
+                <div className="export-row">
+                  <span className="export-label">학생답안 원본</span>
+                  <button
+                    className="btn-mini"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(rawFile);
+                      a.download = rawFile.name;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    }}
+                  >
+                    다운로드
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {error && <div className="error">{error}</div>}
@@ -489,9 +732,13 @@ export default function Home() {
           <div className="saved">
             <div className="saved-head">
               <h3>저장된 시험</h3>
-              <span className="saved-count">{exams.length}개</span>
+              {!examsLoading && <span className="saved-count">{exams.length}개</span>}
             </div>
-            {exams.length === 0 ? (
+            {examsLoading ? (
+              <div className="saved-loading">
+                <span className="spinner" /> 불러오는 중...
+              </div>
+            ) : exams.length === 0 ? (
               <p className="saved-empty">
                 아직 저장된 시험이 없습니다. 왼쪽에서 시험을 입력하고 <b>시험 저장</b>을 누르세요.
               </p>
@@ -509,6 +756,7 @@ export default function Home() {
                             {ex.class.name}
                           </span>
                         )}
+                        {ex.sourceType === "raw" && <span className="source-badge">학생답안</span>}
                         {ex.name}
                       </span>
                       <span className="exam-meta">
@@ -522,7 +770,10 @@ export default function Home() {
                       </button>
                       <button onClick={() => handleRename(ex)}>이름변경</button>
                       <button onClick={() => startReplace(ex.id)}>파일교체</button>
-                      <button onClick={() => downloadExamFile(ex)}>원본</button>
+                      <button onClick={() => downloadExamFile(ex)}>채점결과 원본</button>
+                      {ex.sourceType === "raw" && (
+                        <button onClick={() => downloadExamRawFile(ex)}>학생답안 원본</button>
+                      )}
                       <button className="danger" onClick={() => handleDelete(ex)}>
                         삭제
                       </button>

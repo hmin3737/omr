@@ -10,6 +10,10 @@ export const EXAM_META_SELECT = {
   note: true,
   classId: true,
   class: { select: { id: true, name: true, color: true } },
+  sourceType: true,
+  rawFileName: true,
+  rawFileType: true,
+  answerKey: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.ExamSelect;

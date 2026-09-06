@@ -11,17 +11,22 @@ datasource db {
 }
 
 model Exam {
-  id        String      @id @default(cuid())
-  name      String
-  fileName  String
-  fileType  String
-  fileData  Bytes // 원본 채점결과 파일 내용
-  settings  Json // ExamSettings (cutoff, lowThreshold, electiveStart, selected)
-  note      String      @default("") // 시험 메모
-  classId   String? // 소속 반
-  class     ClassGroup? @relation(fields: [classId], references: [id])
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id           String      @id @default(cuid())
+  name         String
+  fileName     String
+  fileType     String
+  fileData     Bytes // 채점결과 파일 내용 (raw 모드일 때는 채점을 거쳐 생성된 표준 채점결과 포맷)
+  settings     Json // ExamSettings (cutoff, lowThreshold, electiveStart, selected)
+  note         String      @default("") // 시험 메모
+  classId      String? // 소속 반
+  class        ClassGroup? @relation(fields: [classId], references: [id])
+  sourceType   String      @default("graded") // "graded"(채점결과 업로드) | "raw"(학생답안+정답 입력)
+  rawFileName  String?
+  rawFileType  String?
+  rawFileData  Bytes? // raw 모드일 때 업로드한 학생답안 원본
+  answerKey    Json? // raw 모드일 때 채점에 사용한 AnswerKeyPayload 스냅샷
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@index([updatedAt])
 }
@@ -32,4 +37,12 @@ model ClassGroup {
   color     String   @default("#2a78d6")
   createdAt DateTime @default(now())
   exams     Exam[]
+}
+
+model AnswerKeyTemplate {
+  id        String   @id @default(cuid())
+  name      String   @unique // 정답 템플릿 이름 (다른 분반에서 같은 이름으로 검색해 불러옴)
+  payload   Json // AnswerKeyPayload
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
