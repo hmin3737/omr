@@ -8,7 +8,11 @@ interface Attachment {
   mimeType: string;
 }
 
-export default function EmailButton({ getAttachment }: { getAttachment: () => Attachment }) {
+export default function EmailButton({
+  getAttachment,
+}: {
+  getAttachment: () => Attachment | Promise<Attachment>;
+}) {
   const [busy, setBusy] = useState(false);
 
   async function handleClick() {
@@ -16,7 +20,7 @@ export default function EmailButton({ getAttachment }: { getAttachment: () => At
     if (!to) return;
     setBusy(true);
     try {
-      const att = getAttachment();
+      const att = await getAttachment();
       const res = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

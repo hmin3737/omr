@@ -898,8 +898,17 @@ table.answer-grid th {
   z-index: 1;
 }
 .points-input {
-  width: 52px;
-  padding: 4px 6px;
+  width: 44px;
+  padding: 4px 4px;
+  text-align: center;
+  font-size: 13px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.points-input::-webkit-outer-spin-button,
+.points-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .answer-input {
   width: 64px;
@@ -940,6 +949,13 @@ table.answer-grid th {
   font-size: 13px;
   font-weight: 600;
   min-width: 84px;
+}
+.format-select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  background: #fff;
 }
 
 /* ---- 저장된 시험 로딩 ---- */

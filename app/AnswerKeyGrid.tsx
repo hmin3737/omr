@@ -55,6 +55,19 @@ export default function AnswerKeyGrid({
     });
   }
 
+  // 정답 입력 칸에서 ↓/↑ 로 바로 다음/이전 문항의 같은 칸(공통 정답 또는 같은 선택과목)으로 이동
+  function handleAnswerArrowKey(e: React.KeyboardEvent<HTMLInputElement>, number: number, col: "c" | Elective) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const targetNumber = number + (e.key === "ArrowDown" ? 1 : -1);
+    const target = value.questions.find((q) => q.number === targetNumber);
+    if (!target) return;
+    const targetCol: "c" | Elective = targetNumber < value.electiveStart ? "c" : col === "c" ? 1 : col;
+    const el = document.getElementById(`answer-${targetNumber}-${targetCol}`) as HTMLInputElement | null;
+    el?.focus();
+    el?.select();
+  }
+
   async function handleLoadTemplate(id: string, name: string) {
     setBusy(true);
     setNotice("");
@@ -190,9 +203,11 @@ export default function AnswerKeyGrid({
                   {q.number < value.electiveStart ? (
                     <input
                       type="text"
+                      id={`answer-${q.number}-c`}
                       className="answer-input"
                       value={q.answer}
                       onChange={(e) => updateQuestion(q.number, { answer: e.target.value })}
+                      onKeyDown={(e) => handleAnswerArrowKey(e, q.number, "c")}
                     />
                   ) : (
                     <div className="elective-answers">
@@ -201,11 +216,13 @@ export default function AnswerKeyGrid({
                           {ELECTIVE_LABEL[e]}
                           <input
                             type="text"
+                            id={`answer-${q.number}-${e}`}
                             className="answer-input"
                             value={q.answers[e]}
                             onChange={(ev) =>
                               updateQuestion(q.number, { answers: { ...q.answers, [e]: ev.target.value } })
                             }
+                            onKeyDown={(ev) => handleAnswerArrowKey(ev, q.number, e)}
                           />
                         </label>
                       ))}

@@ -18,6 +18,7 @@ import {
   gradedResultBase64,
   questionAnalysisBase64,
   gradedResultToFile,
+  fileToAttachment,
 } from "@/lib/gradingExport";
 import {
   createExam,
@@ -86,6 +87,8 @@ export default function Home() {
   const [answerKey, setAnswerKey] = useState<AnswerKeyPayload>(() => buildDefaultAnswerKey(30, 23));
   const [templateName, setTemplateName] = useState("");
   const [gradingResult, setGradingResult] = useState<GradingResult | null>(null);
+  const [gradedFormat, setGradedFormat] = useState<"xls" | "csv">("xls");
+  const [qaFormat, setQaFormat] = useState<"xls" | "csv">("xls");
   const [cutoff, setCutoff] = useState("50");
   const [lowThreshold, setLowThreshold] = useState("50");
   const [electiveStart, setElectiveStart] = useState("23");
@@ -677,23 +680,33 @@ export default function Home() {
             <div className="export-group">
               <div className="export-row">
                 <span className="export-label">채점결과</span>
-                <button className="btn-mini" onClick={() => downloadGradedResult(gradingResult, "xls")}>
-                  xls
+                <select
+                  className="format-select"
+                  value={gradedFormat}
+                  onChange={(e) => setGradedFormat(e.target.value as "xls" | "csv")}
+                >
+                  <option value="xls">xls</option>
+                  <option value="csv">csv</option>
+                </select>
+                <button className="btn-mini" onClick={() => downloadGradedResult(gradingResult, gradedFormat)}>
+                  다운로드
                 </button>
-                <button className="btn-mini" onClick={() => downloadGradedResult(gradingResult, "csv")}>
-                  csv
-                </button>
-                <EmailButton getAttachment={() => gradedResultBase64(gradingResult, "xls")} />
+                <EmailButton getAttachment={() => gradedResultBase64(gradingResult, gradedFormat)} />
               </div>
               <div className="export-row">
                 <span className="export-label">문항분석</span>
-                <button className="btn-mini" onClick={() => downloadQuestionAnalysis(gradingResult, "xls")}>
-                  xls
+                <select
+                  className="format-select"
+                  value={qaFormat}
+                  onChange={(e) => setQaFormat(e.target.value as "xls" | "csv")}
+                >
+                  <option value="xls">xls</option>
+                  <option value="csv">csv</option>
+                </select>
+                <button className="btn-mini" onClick={() => downloadQuestionAnalysis(gradingResult, qaFormat)}>
+                  다운로드
                 </button>
-                <button className="btn-mini" onClick={() => downloadQuestionAnalysis(gradingResult, "csv")}>
-                  csv
-                </button>
-                <EmailButton getAttachment={() => questionAnalysisBase64(gradingResult, "xls")} />
+                <EmailButton getAttachment={() => questionAnalysisBase64(gradingResult, qaFormat)} />
               </div>
               {rawFile && (
                 <div className="export-row">
@@ -710,6 +723,7 @@ export default function Home() {
                   >
                     다운로드
                   </button>
+                  <EmailButton getAttachment={() => fileToAttachment(rawFile)} />
                 </div>
               )}
             </div>
@@ -769,8 +783,12 @@ export default function Home() {
                         불러오기
                       </button>
                       <button onClick={() => handleRename(ex)}>이름변경</button>
-                      <button onClick={() => startReplace(ex.id)}>파일교체</button>
-                      <button onClick={() => downloadExamFile(ex)}>채점결과 원본</button>
+                      {ex.sourceType !== "raw" && (
+                        <button onClick={() => startReplace(ex.id)}>파일교체</button>
+                      )}
+                      <button onClick={() => downloadExamFile(ex)}>
+                        {ex.sourceType === "raw" ? "채점결과 파일" : "채점결과 원본"}
+                      </button>
                       {ex.sourceType === "raw" && (
                         <button onClick={() => downloadExamRawFile(ex)}>학생답안 원본</button>
                       )}

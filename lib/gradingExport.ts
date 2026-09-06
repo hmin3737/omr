@@ -198,6 +198,18 @@ function toBase64(
   };
 }
 
+/** 임의의 File(예: 업로드된 학생답안 원본)을 이메일 첨부용 base64로 변환 */
+export async function fileToAttachment(
+  file: File
+): Promise<{ base64: string; filename: string; mimeType: string }> {
+  const buf = await file.arrayBuffer();
+  return {
+    base64: arrayBufferToBase64(buf),
+    filename: file.name,
+    mimeType: file.type || "application/octet-stream",
+  };
+}
+
 function arrayBufferToBase64(buf: ArrayBuffer): string {
   let binary = "";
   const bytes = new Uint8Array(buf);
