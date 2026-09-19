@@ -10,8 +10,12 @@ interface Attachment {
 
 export default function EmailButton({
   getAttachment,
+  label = "이메일로 보내기",
+  disabled = false,
 }: {
-  getAttachment: () => Attachment | Promise<Attachment>;
+  getAttachment: () => Attachment | Attachment[] | Promise<Attachment | Attachment[]>;
+  label?: string;
+  disabled?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -20,16 +24,23 @@ export default function EmailButton({
     if (!to) return;
     setBusy(true);
     try {
-      const att = await getAttachment();
+      const result = await getAttachment();
+      const atts = Array.isArray(result) ? result : [result];
+      if (atts.length === 0) {
+        window.alert("보낼 파일을 하나 이상 선택하세요.");
+        return;
+      }
       const res = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: to.trim(),
-          subject: att.filename,
-          filename: att.filename,
-          contentBase64: att.base64,
-          mimeType: att.mimeType,
+          subject: atts[0].filename,
+          attachments: atts.map((a) => ({
+            filename: a.filename,
+            contentBase64: a.base64,
+            mimeType: a.mimeType,
+          })),
         }),
       });
       const body = await res.json().catch(() => null);
@@ -46,8 +57,8 @@ export default function EmailButton({
   }
 
   return (
-    <button type="button" className="btn-mini" onClick={handleClick} disabled={busy}>
-      {busy ? "보내는 중..." : "이메일로 보내기"}
+    <button type="button" className="btn-mini" onClick={handleClick} disabled={busy || disabled}>
+      {busy ? "보내는 중..." : label}
     </button>
   );
 }

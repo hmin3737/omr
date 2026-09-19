@@ -3,16 +3,20 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024; // 15MB
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024; // 15MB (전체 첨부 합산)
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface AttachmentIn {
+  filename?: string;
+  contentBase64?: string;
+  mimeType?: string;
+}
 
 export async function POST(req: Request) {
   let body: {
     to?: string;
     subject?: string;
-    filename?: string;
-    contentBase64?: string;
-    mimeType?: string;
+    attachments?: AttachmentIn[];
   };
   try {
     body = await req.json();
@@ -21,20 +25,24 @@ export async function POST(req: Request) {
   }
 
   const to = String(body.to ?? "").trim();
-  const filename = String(body.filename ?? "첨부파일");
-  const contentBase64 = String(body.contentBase64 ?? "");
-  const mimeType = String(body.mimeType ?? "application/octet-stream");
-  const subject = String(body.subject ?? filename);
+  const attachments = (Array.isArray(body.attachments) ? body.attachments : [])
+    .map((a) => ({
+      filename: String(a.filename ?? "첨부파일"),
+      content: String(a.contentBase64 ?? ""),
+      content_type: String(a.mimeType ?? "application/octet-stream"),
+    }))
+    .filter((a) => a.content);
+  const subject = String(body.subject ?? attachments[0]?.filename ?? "첨부파일");
 
   if (!EMAIL_RE.test(to)) {
     return NextResponse.json({ error: "받는 사람 이메일 주소가 올바르지 않습니다." }, { status: 400 });
   }
-  if (!contentBase64) {
+  if (attachments.length === 0) {
     return NextResponse.json({ error: "첨부할 파일 내용이 없습니다." }, { status: 400 });
   }
-  const approxBytes = (contentBase64.length * 3) / 4;
+  const approxBytes = attachments.reduce((sum, a) => sum + (a.content.length * 3) / 4, 0);
   if (approxBytes > MAX_ATTACHMENT_BYTES) {
-    return NextResponse.json({ error: "첨부파일이 너무 큽니다 (최대 15MB)." }, { status: 413 });
+    return NextResponse.json({ error: "첨부파일이 너무 큽니다 (합계 최대 15MB)." }, { status: 413 });
   }
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -60,8 +68,8 @@ export async function POST(req: Request) {
         from,
         to: [to],
         subject,
-        text: `${filename} 파일을 첨부합니다.`,
-        attachments: [{ filename, content: contentBase64, content_type: mimeType }],
+        text: `${attachments.map((a) => a.filename).join(", ")} 파일을 첨부합니다.`,
+        attachments,
       }),
     });
     if (!res.ok) {

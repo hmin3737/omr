@@ -89,6 +89,7 @@ export default function Home() {
   const [gradingResult, setGradingResult] = useState<GradingResult | null>(null);
   const [gradedFormat, setGradedFormat] = useState<"xls" | "csv">("xls");
   const [qaFormat, setQaFormat] = useState<"xls" | "csv">("xls");
+  const [emailChecks, setEmailChecks] = useState({ graded: true, qa: true, raw: true });
   const [cutoff, setCutoff] = useState("50");
   const [lowThreshold, setLowThreshold] = useState("50");
   const [electiveStart, setElectiveStart] = useState("23");
@@ -137,6 +138,16 @@ export default function Home() {
   }
 
   const toggle = (k: StatKey) => setSelected((s) => ({ ...s, [k]: !s[k] }));
+  const toggleEmailCheck = (k: keyof typeof emailChecks) =>
+    setEmailChecks((s) => ({ ...s, [k]: !s[k] }));
+
+  async function buildSelectedAttachments() {
+    const atts: { base64: string; filename: string; mimeType: string }[] = [];
+    if (emailChecks.graded && gradingResult) atts.push(gradedResultBase64(gradingResult, gradedFormat));
+    if (emailChecks.qa && gradingResult) atts.push(questionAnalysisBase64(gradingResult, qaFormat));
+    if (emailChecks.raw && rawFile) atts.push(await fileToAttachment(rawFile));
+    return atts;
+  }
 
   function currentSettings(): ExamSettings {
     return { cutoff, lowThreshold, electiveStart, selected };
@@ -679,6 +690,12 @@ export default function Home() {
           {mode === "raw" && gradingResult && (
             <div className="export-group">
               <div className="export-row">
+                <input
+                  type="checkbox"
+                  checked={emailChecks.graded}
+                  onChange={() => toggleEmailCheck("graded")}
+                  aria-label="채점결과 이메일에 포함"
+                />
                 <span className="export-label">채점결과</span>
                 <select
                   className="format-select"
@@ -691,9 +708,14 @@ export default function Home() {
                 <button className="btn-mini" onClick={() => downloadGradedResult(gradingResult, gradedFormat)}>
                   다운로드
                 </button>
-                <EmailButton getAttachment={() => gradedResultBase64(gradingResult, gradedFormat)} />
               </div>
               <div className="export-row">
+                <input
+                  type="checkbox"
+                  checked={emailChecks.qa}
+                  onChange={() => toggleEmailCheck("qa")}
+                  aria-label="문항분석 이메일에 포함"
+                />
                 <span className="export-label">문항분석</span>
                 <select
                   className="format-select"
@@ -706,10 +728,15 @@ export default function Home() {
                 <button className="btn-mini" onClick={() => downloadQuestionAnalysis(gradingResult, qaFormat)}>
                   다운로드
                 </button>
-                <EmailButton getAttachment={() => questionAnalysisBase64(gradingResult, qaFormat)} />
               </div>
               {rawFile && (
                 <div className="export-row">
+                  <input
+                    type="checkbox"
+                    checked={emailChecks.raw}
+                    onChange={() => toggleEmailCheck("raw")}
+                    aria-label="학생답안 원본 이메일에 포함"
+                  />
                   <span className="export-label">학생답안 원본</span>
                   <button
                     className="btn-mini"
@@ -723,9 +750,18 @@ export default function Home() {
                   >
                     다운로드
                   </button>
-                  <EmailButton getAttachment={() => fileToAttachment(rawFile)} />
                 </div>
               )}
+              <div className="export-row">
+                <span className="export-label">체크한 항목 한 번에</span>
+                <EmailButton
+                  getAttachment={buildSelectedAttachments}
+                  label="이메일로 보내기"
+                  disabled={
+                    !(emailChecks.graded || emailChecks.qa) && !(emailChecks.raw && rawFile)
+                  }
+                />
+              </div>
             </div>
           )}
           {error && <div className="error">{error}</div>}
