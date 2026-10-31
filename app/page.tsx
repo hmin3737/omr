@@ -469,6 +469,10 @@ export default function Home() {
         </div>
       </div>
 
+      <Link href="/eat" className="eat-launch" aria-label="Eat: 배달 맛집 모음으로 이동">
+        밥
+      </Link>
+
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
       {showClasses && (
         <ClassesModal
