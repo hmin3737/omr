@@ -49,3 +49,31 @@ CREATE TABLE IF NOT EXISTS "AnswerKeyTemplate" (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "AnswerKeyTemplate_name_key" ON "AnswerKeyTemplate"("name");
+
+-- Eat: 배달 맛집 데이터베이스
+CREATE TABLE IF NOT EXISTS "Restaurant" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "baeminUrl" TEXT NOT NULL DEFAULT '',
+    "categories" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "meals" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "openTime" TEXT NOT NULL DEFAULT '',
+    "closeTime" TEXT NOT NULL DEFAULT '',
+    "breakStart" TEXT NOT NULL DEFAULT '',
+    "breakEnd" TEXT NOT NULL DEFAULT '',
+    "closedDays" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
+    "meetPayment" BOOLEAN NOT NULL DEFAULT true,
+    "storeDelivery" BOOLEAN NOT NULL DEFAULT true,
+    "pricePerPerson" INTEGER,
+    "minOrder" INTEGER,
+    "menus" JSONB NOT NULL DEFAULT '[]',
+    "memo" TEXT NOT NULL DEFAULT '',
+    "createdBy" TEXT NOT NULL DEFAULT '',
+    "recommended" BOOLEAN NOT NULL DEFAULT false,
+    "likes" INTEGER NOT NULL DEFAULT 0,
+    "lastOrderedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Restaurant_pkey" PRIMARY KEY ("id")
+);

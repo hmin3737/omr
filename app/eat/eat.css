@@ -1,0 +1,407 @@
+/* ---- Eat: 배달 맛집 모음 ---- */
+
+.eat {
+  --eat-rec: #b45309;
+  --eat-rec-soft: #fef3c7;
+  --eat-open: #15803d;
+  --eat-open-soft: #dcfce7;
+}
+
+.eat input[type="url"],
+.eat input[type="time"],
+.eat input[type="password"],
+.eat textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+.eat textarea {
+  resize: vertical;
+}
+.eat textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.eat-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.eat-head .sub {
+  margin-bottom: 20px;
+}
+.eat-head-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 공용 버튼 */
+.eat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.eat-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.eat-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.eat-btn.primary:hover {
+  color: #fff;
+  opacity: 0.9;
+}
+.eat-btn.ghost {
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+.eat-btn.liked {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft);
+  color: var(--accent);
+  cursor: default;
+}
+.eat-text-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px;
+}
+.eat-text-btn:hover {
+  color: var(--accent);
+}
+.eat-text-btn.danger:hover {
+  color: #dc2626;
+}
+
+/* 칩 */
+.eat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.eat-chip {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.eat-chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.eat-clear {
+  margin-left: 4px;
+}
+
+/* 필터 */
+.eat-filters {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.eat-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.eat-filter-label {
+  font-size: 13px;
+  font-weight: 600;
+  width: 32px;
+  flex-shrink: 0;
+}
+.eat-budget {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.eat-budget input[type="text"] {
+  width: 96px;
+  text-align: right;
+}
+.eat-search {
+  flex: 1;
+  min-width: 160px;
+}
+.eat-filters .eat-search[type="text"] {
+  width: auto;
+}
+.eat-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.eat-pick-btn {
+  font-size: 16px;
+  padding: 13px;
+}
+.eat-pick-count {
+  font-weight: 400;
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+/* 뽑기 결과 */
+.eat-picked {
+  margin-bottom: 24px;
+}
+.eat-picked-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.eat-count {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.eat-count span {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 13px;
+}
+.eat-empty {
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 가게 카드 */
+.eat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+@media (max-width: 680px) {
+  .eat-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.eat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.eat-card.highlight {
+  border: 2px solid var(--accent);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.12);
+}
+.eat-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.eat-card-head h3 {
+  font-size: 17px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.eat-rec {
+  background: var(--eat-rec-soft);
+  color: var(--eat-rec);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.eat-status {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.eat-status.open {
+  background: var(--eat-open-soft);
+  color: var(--eat-open);
+}
+.eat-status.closed {
+  background: #f1f5f9;
+  color: var(--muted);
+}
+.eat-status.unknown {
+  border: 1px dashed var(--border);
+  color: var(--muted);
+}
+.eat-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.eat-tag {
+  font-size: 12px;
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+.eat-tag.meal {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.eat-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.eat-facts span:first-child {
+  color: var(--text);
+  font-weight: 600;
+}
+.eat-facts .over {
+  color: #dc2626 !important;
+}
+.eat-warn {
+  font-size: 12px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.eat-menus {
+  list-style: none;
+  font-size: 13px;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+.eat-menus li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+.eat-menus li span:last-child {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.eat-menus .eat-more {
+  color: var(--muted);
+  font-size: 12px;
+}
+.eat-memo {
+  font-size: 13px;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.eat-card-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+.eat-foot-spacer {
+  flex: 1;
+}
+.eat-nolink {
+  font-size: 12px;
+  color: var(--muted);
+}
+.eat-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.eat-meta:empty {
+  display: none;
+}
+
+/* 등록 폼 */
+.eat-form {
+  max-width: 600px;
+  max-height: 90vh;
+}
+.eat-form .modal-body {
+  padding-top: 18px;
+}
+.eat-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.eat-time-row input {
+  flex: 1;
+  min-width: 0;
+}
+.eat-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.eat-menu-row {
+  display: grid;
+  grid-template-columns: 1fr 110px auto;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.eat .btn-mini {
+  padding: 6px 12px;
+}
+
+@media (max-width: 520px) {
+  .wrap.eat {
+    padding: 20px 16px 48px;
+  }
+  .eat-two {
+    grid-template-columns: 1fr;
+  }
+  .eat-filter-label {
+    width: auto;
+  }
+  .eat .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .eat-form {
+    max-height: 92vh;
+    border-radius: 14px 14px 0 0;
+  }
+}

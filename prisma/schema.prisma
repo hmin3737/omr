@@ -46,3 +46,29 @@ model AnswerKeyTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Eat: 배달 맛집 데이터베이스 (공개, 추천 지정·삭제는 관리자 전용)
+model Restaurant {
+  id             String    @id @default(cuid())
+  name           String
+  baeminUrl      String    @default("") // 배민 앱 가게 공유 링크
+  categories     String[]  @default([])
+  meals          String[]  @default([]) // "breakfast" | "lunch" | "dinner"
+  openTime       String    @default("") // "HH:MM" (한국 시간)
+  closeTime      String    @default("")
+  breakStart     String    @default("")
+  breakEnd       String    @default("")
+  closedDays     Int[]     @default([]) // 0(일)~6(토)
+  meetPayment    Boolean   @default(true) // 만나서 카드결제
+  storeDelivery  Boolean   @default(true) // 가게배달
+  pricePerPerson Int?
+  minOrder       Int?
+  menus          Json      @default("[]") // MenuItem[]
+  memo           String    @default("")
+  createdBy      String    @default("")
+  recommended    Boolean   @default(false)
+  likes          Int       @default(0)
+  lastOrderedAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}

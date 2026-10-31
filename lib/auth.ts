@@ -26,10 +26,10 @@ function sessionSecret(): string {
   return process.env.SESSION_SECRET || `omr-session-salt::${passwordCandidates().join("|")}`;
 }
 
-async function hmac(data: string): Promise<string> {
+async function hmac(secret: string, data: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(sessionSecret()),
+    new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
@@ -38,24 +38,34 @@ async function hmac(data: string): Promise<string> {
   return Buffer.from(sig).toString("hex");
 }
 
-/** 로그인 성공 시 쿠키에 담을 서명된 토큰(만료시각 포함) 생성 */
-export async function createAuthToken(): Promise<{ value: string; maxAge: number }> {
-  const expires = Date.now() + COOKIE_MAX_AGE_SEC * 1000;
+/** 주어진 비밀키로 서명된 토큰(만료시각 포함) 생성 */
+export async function signToken(secret: string, maxAgeSec: number): Promise<{ value: string; maxAge: number }> {
+  const expires = Date.now() + maxAgeSec * 1000;
   const payload = String(expires);
-  const sig = await hmac(payload);
-  return { value: `${payload}.${sig}`, maxAge: COOKIE_MAX_AGE_SEC };
+  const sig = await hmac(secret, payload);
+  return { value: `${payload}.${sig}`, maxAge: maxAgeSec };
 }
 
-/** 요청에 담긴 토큰이 유효한지(서명 일치 + 만료 전) 검사 */
-export async function verifyAuthToken(token: string | undefined | null): Promise<boolean> {
+/** 토큰이 유효한지(서명 일치 + 만료 전) 검사 */
+export async function verifyToken(token: string | undefined | null, secret: string): Promise<boolean> {
   if (!token) return false;
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return false;
   const expires = Number(payload);
   if (!Number.isFinite(expires) || Date.now() > expires) return false;
-  const expected = await hmac(payload);
+  const expected = await hmac(secret, payload);
   if (expected.length !== sig.length) return false;
   let diff = 0;
   for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
   return diff === 0;
+}
+
+/** 로그인 성공 시 쿠키에 담을 사이트 인증 토큰 생성 */
+export function createAuthToken(): Promise<{ value: string; maxAge: number }> {
+  return signToken(sessionSecret(), COOKIE_MAX_AGE_SEC);
+}
+
+/** 요청에 담긴 사이트 인증 토큰이 유효한지 검사 */
+export function verifyAuthToken(token: string | undefined | null): Promise<boolean> {
+  return verifyToken(token, sessionSecret());
 }

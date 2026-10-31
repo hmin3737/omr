@@ -1,24 +1,15 @@
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE, checkPassword, createAuthToken } from "@/lib/auth";
+import { clientIp, createLoginLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// 간단한 인메모리 레이트리밋 (서버리스 인스턴스별로만 유효 — 최소한의 브루트포스 억제 목적)
-const attempts = new Map<string, { count: number; resetAt: number }>();
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 8;
-
-function clientIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  return fwd?.split(",")[0]?.trim() || "unknown";
-}
+const limiter = createLoginLimiter();
 
 export async function POST(req: Request) {
   const ip = clientIp(req);
-  const now = Date.now();
-  const entry = attempts.get(ip);
-  if (entry && entry.resetAt > now && entry.count >= MAX_ATTEMPTS) {
+  if (limiter.blocked(ip)) {
     return NextResponse.json(
       { error: "로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요." },
       { status: 429 }
@@ -34,12 +25,11 @@ export async function POST(req: Request) {
   }
 
   if (!checkPassword(password)) {
-    const next = !entry || entry.resetAt <= now ? { count: 1, resetAt: now + WINDOW_MS } : { count: entry.count + 1, resetAt: entry.resetAt };
-    attempts.set(ip, next);
+    limiter.fail(ip);
     return NextResponse.json({ error: "비밀번호가 올바르지 않습니다." }, { status: 401 });
   }
 
-  attempts.delete(ip);
+  limiter.reset(ip);
   const { value, maxAge } = await createAuthToken();
   const res = NextResponse.json({ ok: true });
   res.cookies.set(AUTH_COOKIE, value, {

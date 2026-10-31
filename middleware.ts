@@ -6,6 +6,8 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
+  // Eat 은 비밀번호 없이 공개 (관리자 기능은 각 API 에서 따로 검사)
+  if (isEatPath(pathname)) return NextResponse.next();
 
   const token = req.cookies.get(AUTH_COOKIE)?.value;
   const ok = await verifyAuthToken(token);
@@ -19,6 +21,10 @@ export async function middleware(req: NextRequest) {
   url.pathname = "/login";
   url.searchParams.set("next", pathname);
   return NextResponse.redirect(url);
+}
+
+function isEatPath(pathname: string): boolean {
+  return ["/eat", "/api/eat"].some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
 export const config = {
