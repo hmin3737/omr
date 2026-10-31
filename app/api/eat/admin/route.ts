@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const expected = adminPassword();
   if (!expected) {
     return NextResponse.json(
-      { error: "관리자 비밀번호가 설정되지 않았습니다. EAT_ADMIN_PASSWORD 환경변수를 설정하세요." },
+      { error: "실장 비밀번호가 설정되지 않았습니다. EAT_ADMIN_PASSWORD 환경변수를 설정하세요." },
       { status: 500 }
     );
   }

@@ -21,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const admin = await isEatAdmin();
     if (!admin && current.recommended)
-      return NextResponse.json({ error: "추천 가게는 관리자만 수정할 수 있습니다." }, { status: 403 });
+      return NextResponse.json({ error: "추천 가게는 실장만 수정할 수 있습니다." }, { status: 403 });
     if (!admin) input.recommended = current.recommended;
 
     const updated = await prisma.restaurant.update({
@@ -42,7 +42,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 // 삭제: 관리자만
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   if (!(await isEatAdmin()))
-    return NextResponse.json({ error: "삭제는 관리자만 할 수 있습니다." }, { status: 403 });
+    return NextResponse.json({ error: "삭제는 실장만 할 수 있습니다." }, { status: 403 });
   try {
     await prisma.restaurant.delete({ where: { id: params.id } });
     return new NextResponse(null, { status: 204 });

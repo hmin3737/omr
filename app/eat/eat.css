@@ -33,8 +33,6 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-}
-.eat-head .sub {
   margin-bottom: 20px;
 }
 .eat-head-actions {

@@ -220,8 +220,7 @@ export default function EatPage() {
     <div className="wrap eat">
       <div className="eat-head">
         <div>
-          <h1>Eat</h1>
-          <p className="sub">만나서 카드결제 · 가게배달 되는 배달 맛집 모음. 고르기 어려우면 랜덤으로 뽑아 보세요.</p>
+          <h1>밥</h1>
         </div>
         <div className="eat-head-actions">
           <button className="eat-btn primary" onClick={() => setFormFor("new")}>
@@ -229,11 +228,11 @@ export default function EatPage() {
           </button>
           {admin ? (
             <button className="eat-btn" onClick={handleLogout}>
-              관리자 로그아웃
+              실장 로그아웃
             </button>
           ) : (
             <button className="eat-btn ghost" onClick={() => setAdminOpen(true)}>
-              관리자
+              실장
             </button>
           )}
         </div>
@@ -535,14 +534,14 @@ function AdminLogin({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="login-card" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
-        <h1>관리자 로그인</h1>
-        <p className="sub">추천 지정, 추천 가게 수정, 삭제는 관리자만 할 수 있습니다.</p>
+        <h1>실장 로그인</h1>
+        <p className="sub">추천 지정, 추천 가게 수정, 삭제는 실장만 할 수 있습니다.</p>
         <input
           type="password"
           autoFocus
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="관리자 비밀번호"
+          placeholder="실장 비밀번호"
         />
         <button className="btn" type="submit" disabled={busy || !password}>
           {busy ? "확인 중..." : "로그인"}
