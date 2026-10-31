@@ -4,15 +4,13 @@ import { useState, type FormEvent } from "react";
 import type { FoodCategory } from "@/lib/eat";
 import { createCategory, deleteCategory, renameCategory } from "@/lib/eat-client";
 
-/** 음식 종류 추가·이름 변경(누구나), 삭제(실장만) */
+/** 음식 종류 추가·이름 변경·삭제 (누구나) */
 export default function CategoryManager({
   categories,
-  admin,
   onChanged,
   onClose,
 }: {
   categories: FoodCategory[];
-  admin: boolean;
   onChanged: () => Promise<void>;
   onClose: () => void;
 }) {
@@ -70,7 +68,7 @@ export default function CategoryManager({
         </div>
         <div className="modal-body">
           <p className="hint eat-cat-hint">
-            이름을 바꾸면 그 종류가 붙은 가게들도 함께 바뀝니다.{admin ? "" : " 삭제는 실장만 할 수 있습니다."}
+            이름을 바꾸거나 삭제하면 그 종류가 붙은 가게들에도 함께 반영됩니다.
           </p>
           <ul className="eat-cat-list">
             {categories.map((c) => {
@@ -95,16 +93,14 @@ export default function CategoryManager({
                   >
                     {busyId === c.id ? "..." : "저장"}
                   </button>
-                  {admin && (
-                    <button
-                      type="button"
-                      className="btn-mini eat-danger"
-                      disabled={busyId !== null}
-                      onClick={() => handleDelete(c)}
-                    >
-                      삭제
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn-mini eat-danger"
+                    disabled={busyId !== null}
+                    onClick={() => handleDelete(c)}
+                  >
+                    삭제
+                  </button>
                 </li>
               );
             })}

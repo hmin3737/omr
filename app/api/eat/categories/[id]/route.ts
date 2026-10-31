@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isEatAdmin } from "@/lib/eat-admin";
 import { sanitizeCategoryName } from "@/lib/eat";
 
 export const runtime = "nodejs";
@@ -43,10 +42,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-// 삭제: 실장만. 가게들에서도 이 종류를 뺀다.
+// 삭제: 누구나 가능. 가게들에서도 이 종류를 뺀다.
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  if (!(await isEatAdmin()))
-    return NextResponse.json({ error: "종류 삭제는 실장만 할 수 있습니다." }, { status: 403 });
   try {
     const current = await prisma.foodCategory.findUnique({ where: { id: params.id } });
     if (!current) return NextResponse.json({ error: "종류를 찾을 수 없습니다." }, { status: 404 });

@@ -23,6 +23,7 @@ import {
   getAdminStatus,
   likeRestaurant,
   listCategories,
+  updateRestaurant,
   listRestaurants,
   markOrdered,
 } from "@/lib/eat-client";
@@ -217,6 +218,14 @@ export default function EatPage() {
     }
   }
 
+  async function handleToggleRecommend(r: Restaurant) {
+    try {
+      replace(await updateRestaurant(r.id, { ...r, recommended: !r.recommended }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "처리 실패");
+    }
+  }
+
   async function handleLogout() {
     await adminLogout().catch(() => null);
     setAdmin(false);
@@ -232,6 +241,7 @@ export default function EatPage() {
     onOrdered: () => handleOrdered(r),
     onEdit: () => setFormFor(r),
     onDelete: () => handleDelete(r),
+    onToggleRecommend: () => handleToggleRecommend(r),
   });
 
   return (
@@ -387,7 +397,6 @@ export default function EatPage() {
       {catsOpen && (
         <CategoryManager
           categories={categories}
-          admin={admin}
           onChanged={reloadCategories}
           onClose={() => setCatsOpen(false)}
         />
@@ -416,6 +425,7 @@ function RestaurantCard({
   onOrdered,
   onEdit,
   onDelete,
+  onToggleRecommend,
 }: {
   r: Restaurant;
   now: KstNow | null;
@@ -427,11 +437,11 @@ function RestaurantCard({
   onOrdered: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleRecommend: () => void;
 }) {
   const open = now ? isOpenAt(r, now) : null;
   const price = perPersonPrice(r);
   const ordered = daysSince(r.lastOrderedAt);
-  const canEdit = admin || !r.recommended;
   const mealLabels = MEALS.filter((m) => r.meals.includes(m.key)).map((m) => m.label);
   const shownMenus = r.menus.slice(0, 4);
 
@@ -523,16 +533,17 @@ function RestaurantCard({
           {ordered === 0 ? "오늘 주문함 ✓" : "여기서 주문함"}
         </button>
         <span className="eat-foot-spacer" />
-        {canEdit && (
-          <button className="eat-text-btn" onClick={onEdit}>
-            수정
-          </button>
-        )}
         {admin && (
-          <button className="eat-text-btn danger" onClick={onDelete}>
-            삭제
+          <button className="eat-text-btn" onClick={onToggleRecommend}>
+            {r.recommended ? "추천 해제" : "추천"}
           </button>
         )}
+        <button className="eat-text-btn" onClick={onEdit}>
+          수정
+        </button>
+        <button className="eat-text-btn danger" onClick={onDelete}>
+          삭제
+        </button>
       </div>
 
       <div className="eat-meta">
@@ -566,7 +577,7 @@ function AdminLogin({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
     <div className="modal-overlay" onClick={onClose}>
       <form className="login-card" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
         <h1>실장 로그인</h1>
-        <p className="sub">추천 지정, 추천 가게 수정, 삭제는 실장만 할 수 있습니다.</p>
+        <p className="sub">추천 설정·해제는 실장만 할 수 있습니다.</p>
         <input
           type="password"
           autoFocus
