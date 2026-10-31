@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isEatAdmin } from "@/lib/eat-admin";
 import { sanitizeRestaurantInput } from "@/lib/eat";
+import { keepKnownCategories } from "@/lib/eat-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
     const input = sanitizeRestaurantInput(await req.json());
     if (!input) return NextResponse.json({ error: "가게 이름이 필요합니다." }, { status: 400 });
     if (!(await isEatAdmin())) input.recommended = false;
+    await keepKnownCategories(input);
     const created = await prisma.restaurant.create({ data: { ...input, menus: input.menus.map(({ name, price }) => ({ name, price })) } });
     return NextResponse.json(created, { status: 201 });
   } catch (e) {

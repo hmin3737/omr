@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
-  CATEGORIES,
   DAY_LABELS,
   DEFAULT_BUDGET,
   MEALS,
@@ -13,6 +12,7 @@ import {
   meetsOrderRules,
   perPersonPrice,
   type KstNow,
+  type FoodCategory,
   type MealKey,
   type Restaurant,
 } from "@/lib/eat";
@@ -22,10 +22,12 @@ import {
   deleteRestaurant,
   getAdminStatus,
   likeRestaurant,
+  listCategories,
   listRestaurants,
   markOrdered,
 } from "@/lib/eat-client";
 import RestaurantForm from "./RestaurantForm";
+import CategoryManager from "./CategoryManager";
 
 const LIKED_KEY = "eat-liked";
 const RECENT_DAYS = 3;
@@ -75,6 +77,7 @@ function weightedPick(list: Restaurant[], excludeId: string | null): Restaurant 
 
 export default function EatPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [categories, setCategories] = useState<FoodCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [admin, setAdmin] = useState(false);
@@ -92,6 +95,7 @@ export default function EatPage() {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [formFor, setFormFor] = useState<Restaurant | "new" | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [catsOpen, setCatsOpen] = useState(false);
   const pickRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -103,8 +107,13 @@ export default function EatPage() {
 
     (async () => {
       try {
-        const [list, status] = await Promise.all([listRestaurants(), getAdminStatus()]);
+        const [list, cats, status] = await Promise.all([
+          listRestaurants(),
+          listCategories(),
+          getAdminStatus(),
+        ]);
         setRestaurants(list);
+        setCategories(cats);
         setAdmin(status.admin);
       } catch (e) {
         setError(e instanceof Error ? e.message : "불러오기 실패");
@@ -153,6 +162,15 @@ export default function EatPage() {
     const r = weightedPick(filtered, pickedId);
     setPickedId(r?.id ?? null);
     requestAnimationFrame(() => pickRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+  }
+
+  // 종류 이름 변경·삭제는 가게들의 종류에도 반영되므로 둘 다 다시 불러온다
+  async function reloadCategories() {
+    const [cats, list] = await Promise.all([listCategories(), listRestaurants()]);
+    setCategories(cats);
+    setRestaurants(list);
+    const names = new Set(cats.map((c) => c.name));
+    setCats((s) => new Set(Array.from(s).filter((c) => names.has(c))));
   }
 
   function replace(r: Restaurant) {
@@ -256,7 +274,7 @@ export default function EatPage() {
         <div className="eat-filter-row">
           <span className="eat-filter-label">종류</span>
           <div className="eat-chips">
-            {CATEGORIES.map((c) => (
+            {categories.map(({ name: c }) => (
               <button
                 key={c}
                 className={cats.has(c) ? "eat-chip on" : "eat-chip"}
@@ -277,6 +295,9 @@ export default function EatPage() {
                 선택 해제
               </button>
             )}
+            <button className="link-btn eat-clear" onClick={() => setCatsOpen(true)}>
+              종류 편집
+            </button>
           </div>
         </div>
         <div className="eat-filter-row">
@@ -354,11 +375,21 @@ export default function EatPage() {
         <RestaurantForm
           editing={formFor === "new" ? null : formFor}
           admin={admin}
+          categories={categories}
+          onCategoryAdded={(c) => setCategories((list) => [...list, c])}
           onClose={() => setFormFor(null)}
           onSaved={(r) => {
             replace(r);
             setFormFor(null);
           }}
+        />
+      )}
+      {catsOpen && (
+        <CategoryManager
+          categories={categories}
+          admin={admin}
+          onChanged={reloadCategories}
+          onClose={() => setCatsOpen(false)}
         />
       )}
       {adminOpen && (

@@ -1,6 +1,6 @@
 // Eat API 클라이언트 (브라우저에서 사용)
 
-import type { Restaurant, RestaurantInput } from "./eat";
+import type { FoodCategory, Restaurant, RestaurantInput } from "./eat";
 
 async function readError(res: Response): Promise<string> {
   try {
@@ -42,6 +42,17 @@ export const likeRestaurant = (id: string) =>
 
 export const markOrdered = (id: string) =>
   request<{ lastOrderedAt: string }>(`/api/eat/restaurants/${id}/ordered`, { method: "POST" });
+
+export const listCategories = () => request<FoodCategory[]>("/api/eat/categories");
+
+export const createCategory = (name: string) =>
+  request<FoodCategory>("/api/eat/categories", json("POST", { name }));
+
+export const renameCategory = (id: string, name: string) =>
+  request<FoodCategory>(`/api/eat/categories/${id}`, json("PATCH", { name }));
+
+export const deleteCategory = (id: string) =>
+  request<null>(`/api/eat/categories/${id}`, { method: "DELETE" });
 
 export const getAdminStatus = () => request<{ admin: boolean }>("/api/eat/admin");
 

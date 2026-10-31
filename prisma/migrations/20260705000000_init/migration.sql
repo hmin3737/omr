@@ -77,3 +77,25 @@ CREATE TABLE IF NOT EXISTS "Restaurant" (
 
     CONSTRAINT "Restaurant_pkey" PRIMARY KEY ("id")
 );
+
+-- Eat 음식 종류
+CREATE TABLE IF NOT EXISTS "FoodCategory" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "FoodCategory_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "FoodCategory_name_key" ON "FoodCategory"("name");
+
+-- 기본 종류는 테이블이 비어 있을 때만 채운다 (사용자가 이름을 바꾼 뒤 빌드해도 되살아나지 않도록)
+INSERT INTO "FoodCategory" ("id", "name", "sortOrder")
+SELECT 'default-' || d.ord, d.name, d.ord
+FROM (VALUES
+    ('한식', 1), ('국밥·찌개', 2), ('중식', 3), ('일식·돈까스', 4), ('분식', 5),
+    ('도시락·덮밥', 6), ('양식', 7), ('아시안', 8), ('치킨', 9), ('피자', 10),
+    ('버거·샌드위치', 11), ('샐러드·건강식', 12), ('기타', 13)
+) AS d(name, ord)
+WHERE NOT EXISTS (SELECT 1 FROM "FoodCategory");

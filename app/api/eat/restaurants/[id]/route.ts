@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isEatAdmin } from "@/lib/eat-admin";
 import { sanitizeRestaurantInput } from "@/lib/eat";
+import { keepKnownCategories } from "@/lib/eat-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (!admin && current.recommended)
       return NextResponse.json({ error: "추천 가게는 실장만 수정할 수 있습니다." }, { status: 403 });
     if (!admin) input.recommended = current.recommended;
+    await keepKnownCategories(input);
 
     const updated = await prisma.restaurant.update({
       where: { id: params.id },

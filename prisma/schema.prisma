@@ -72,3 +72,11 @@ model Restaurant {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
+
+// Eat 음식 종류 (누구나 추가·이름 변경, 삭제는 실장만). Restaurant.categories 에는 이름이 들어간다.
+model FoodCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}

@@ -2,14 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 import {
-  CATEGORIES,
   DAY_LABELS,
   MEALS,
   emptyRestaurantInput,
+  type FoodCategory,
   type Restaurant,
   type RestaurantInput,
 } from "@/lib/eat";
-import { createRestaurant, updateRestaurant } from "@/lib/eat-client";
+import { createCategory, createRestaurant, updateRestaurant } from "@/lib/eat-client";
 
 const AUTHOR_KEY = "eat-author";
 
@@ -55,11 +55,15 @@ function toggleIn<T>(list: T[], v: T): T[] {
 export default function RestaurantForm({
   editing,
   admin,
+  categories,
+  onCategoryAdded,
   onSaved,
   onClose,
 }: {
   editing: Restaurant | null;
   admin: boolean;
+  categories: FoodCategory[];
+  onCategoryAdded: (c: FoodCategory) => void;
   onSaved: (r: Restaurant) => void;
   onClose: () => void;
 }) {
@@ -70,12 +74,38 @@ export default function RestaurantForm({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [newCat, setNewCat] = useState("");
+  const [catBusy, setCatBusy] = useState(false);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   function setMenu(i: number, patch: Partial<{ name: string; price: string }>) {
     setForm((f) => ({ ...f, menus: f.menus.map((m, k) => (k === i ? { ...m, ...patch } : m)) }));
+  }
+
+  // 새 종류를 만들고 바로 이 가게에 선택해 둔다
+  async function addCategory() {
+    const name = newCat.trim();
+    if (!name) return;
+    const existing = categories.find((c) => c.name === name);
+    if (existing) {
+      if (!form.categories.includes(name)) set("categories", [...form.categories, name]);
+      setNewCat("");
+      return;
+    }
+    setError("");
+    setCatBusy(true);
+    try {
+      const created = await createCategory(name);
+      onCategoryAdded(created);
+      setForm((f) => ({ ...f, categories: [...f.categories, created.name] }));
+      setNewCat("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "종류 추가 실패");
+    } finally {
+      setCatBusy(false);
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -129,7 +159,7 @@ export default function RestaurantForm({
           <div className="field">
             <label className="lab">음식 종류</label>
             <div className="eat-chips">
-              {CATEGORIES.map((c) => (
+              {categories.map(({ name: c }) => (
                 <button
                   type="button"
                   key={c}
@@ -139,6 +169,24 @@ export default function RestaurantForm({
                   {c}
                 </button>
               ))}
+            </div>
+            <div className="eat-cat-add">
+              <input
+                type="text"
+                value={newCat}
+                maxLength={20}
+                onChange={(e) => setNewCat(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCategory();
+                  }
+                }}
+                placeholder="원하는 종류가 없으면 새로 추가"
+              />
+              <button type="button" className="btn-mini" disabled={!newCat.trim() || catBusy} onClick={addCategory}>
+                {catBusy ? "..." : "+ 추가"}
+              </button>
             </div>
           </div>
 

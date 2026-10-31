@@ -403,3 +403,35 @@
     border-radius: 14px 14px 0 0;
   }
 }
+
+/* 종류 편집 */
+.eat-cat-hint {
+  margin: 0 0 12px;
+}
+.eat-cat-list {
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.eat-cat-list li,
+.eat-cat-add {
+  display: flex;
+  gap: 6px;
+}
+.eat-cat-list input,
+.eat-cat-add input {
+  flex: 1;
+  min-width: 0;
+}
+.eat-cat-add {
+  margin-top: 8px;
+}
+.eat .btn-mini:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.eat .btn-mini.eat-danger:hover:not(:disabled) {
+  border-color: #dc2626;
+  color: #dc2626;
+}

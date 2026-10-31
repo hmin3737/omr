@@ -1,20 +1,10 @@
 // Eat: 배달 맛집 데이터베이스 공용 타입·상수·판정 로직 (클라이언트/서버 공용)
 
-export const CATEGORIES = [
-  "한식",
-  "국밥·찌개",
-  "중식",
-  "일식·돈까스",
-  "분식",
-  "도시락·덮밥",
-  "양식",
-  "아시안",
-  "치킨",
-  "피자",
-  "버거·샌드위치",
-  "샐러드·건강식",
-  "기타",
-] as const;
+/** 음식 종류. 누구나 추가·이름 변경 가능 (기본 목록은 마이그레이션에서 한 번만 채운다) */
+export interface FoodCategory {
+  id: string;
+  name: string;
+}
 
 export const MEALS = [
   { key: "breakfast", label: "아침" },
@@ -166,6 +156,11 @@ function str(v: unknown, max: number): string {
   return String(v ?? "").trim().slice(0, max);
 }
 
+/** 종류 이름 정리: 공백 정리 후 20자 제한. 비면 빈 문자열. */
+export function sanitizeCategoryName(v: unknown): string {
+  return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, 20);
+}
+
 function time(v: unknown): string {
   const s = str(v, 5);
   return toMinutes(s) === null ? "" : s;
@@ -191,9 +186,10 @@ export function sanitizeRestaurantInput(body: unknown): RestaurantInput | null {
   return {
     name,
     baeminUrl: url(b.baeminUrl),
-    categories: list(b.categories)
-      .map(String)
-      .filter((c) => (CATEGORIES as readonly string[]).includes(c)),
+    // 실제 존재하는 종류인지는 서버 라우트에서 DB 기준으로 다시 거른다
+    categories: Array.from(new Set(list(b.categories).map(sanitizeCategoryName)))
+      .filter(Boolean)
+      .slice(0, 10),
     meals: list(b.meals).map(String).filter((m) => mealKeys.includes(m)),
     openTime: time(b.openTime),
     closeTime: time(b.closeTime),
