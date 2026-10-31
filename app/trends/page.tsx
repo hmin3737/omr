@@ -17,6 +17,19 @@ function parseNum(v: string): number | null {
   return v.trim() === "" || Number.isNaN(n) ? null : n;
 }
 
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 export default function TrendsPage() {
   const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [exams, setExams] = useState<SavedExam[]>([]);
@@ -35,8 +48,9 @@ export default function TrendsPage() {
 
         // 반이 지정된 시험만 대상으로 평균 계산 (저장된 설정 사용)
         const withClass = exs.filter((e) => e.classId);
-        const computed = await Promise.all(
-          withClass.map(async (ex) => {
+        // 시험 파일을 한꺼번에 요청하면 서버리스 인스턴스가 동시에 여러 개 뜨면서
+        // DB 커넥션 한도를 넘기므로 동시 요청 수를 제한한다.
+        const computed = await mapLimit(withClass, 3, async (ex) => {
             try {
               const f = await fetchExamFile(ex);
               const parsed = await parseFile(f, ex.name);
@@ -51,8 +65,7 @@ export default function TrendsPage() {
             } catch {
               return null;
             }
-          })
-        );
+          });
         setPoints(computed.filter((p): p is Point => p !== null));
       } catch (e) {
         setError(e instanceof Error ? e.message : "불러오기 실패");
@@ -116,7 +129,7 @@ export default function TrendsPage() {
         </div>
       ) : error ? (
         <div className="error">{error}</div>
-      ) : examOrder.length === 0 || shownClasses.length === 0 ? (
+      ) : examOrder.length === 0 || seriesByClass.size === 0 ? (
         <div className="report">
           <p className="placeholder">
             표시할 데이터가 없습니다. 시험에 반을 지정하고 저장하면 여기에 추세가 나타납니다.
@@ -138,7 +151,13 @@ export default function TrendsPage() {
                 </button>
               ))}
           </div>
-          <TrendChart classes={shownClasses} examOrder={examOrder} seriesByClass={seriesByClass} />
+          {shownClasses.length === 0 ? (
+            <div className="report">
+              <p className="placeholder">선택된 반이 없습니다. 위에서 반을 선택하세요.</p>
+            </div>
+          ) : (
+            <TrendChart classes={shownClasses} examOrder={examOrder} seriesByClass={seriesByClass} />
+          )}
         </>
       )}
     </div>
